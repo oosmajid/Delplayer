@@ -117,7 +117,12 @@
             const copyHint = document.getElementById('copy-hint');
     
             // --- متغیرهای وضعیت ---
-            let WS = 'ws://194.5.97.179:52346';
+            // --- آدرس سرور به صورت خودکار تشخیص داده می‌شود ---
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsHost = window.location.host; // شامل هاست و پورت است
+            const WS_URL = `${wsProtocol}//${wsHost}`;
+            console.log(`Connecting to WebSocket at: ${WS_URL}`);
+
             let ws;
             let myId = '';
             let partnerId = '';
@@ -143,7 +148,7 @@
             }
     
             function connectWebSocket() {
-                ws = new WebSocket(WS);
+                ws = new WebSocket(WS_URL);
     
                 ws.onopen = () => {
                     myId = randomId();
