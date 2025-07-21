@@ -93,7 +93,6 @@
             let ws;
             let myId = '';
             let partnerId = '';
-            // **رفع باگ ۲:** این پرچم برای جلوگیری از حلقه‌ی بازگشتی استفاده می‌شود
             let isSyncing = false; 
             let partnerVideoDuration = null;
     
@@ -165,13 +164,13 @@
                 }
     
                 if (data.type === 'sync') {
-                    // **رفع باگ ۲:** پرچم را در ابتدای پردازش پیام تنظیم می‌کنیم
+                    // **رفع باگ نهایی:** پرچم را در ابتدای پردازش پیام تنظیم می‌کنیم
                     isSyncing = true;
                     
                     partnerVideoDuration = data.duration || null;
                     
                     // همگام‌سازی زمان ویدیو
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 1) { // افزایش آستانه برای جلوگیری از پرش‌های بی‌مورد
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) { // افزایش آستانه برای جلوگیری از پرش‌های بی‌مورد در شبکه‌های با تاخیر
                         videoPlayer.currentTime = data.value;
                     }
 
@@ -187,11 +186,12 @@
                         videoPlayer.playbackRate = data.rate;
                     }
     
-                    // **رفع باگ ۲:** پرچم را پس از اتمام پردازش همزمان، پاک می‌کنیم
-                    // این کار تضمین می‌کند که رویدادهای ایجاد شده توسط کد بالا، نادیده گرفته شوند
-                    Promise.resolve().then(() => {
+                    // **رفع باگ نهایی:** از یک تایم‌اوت برای پاک کردن پرچم استفاده می‌کنیم.
+                    // این کار تضمین می‌کند که تمام رویدادهای داخلی مرورگر (play, pause, seeked)
+                    // که به صورت برنامه‌ریزی شده اجرا شده‌اند، قبل از ارسال مجدد داده، نادیده گرفته شوند.
+                    setTimeout(() => {
                         isSyncing = false;
-                    });
+                    }, 150); // یک تاخیر ۱۵۰ میلی‌ثانیه‌ای برای اطمینان بیشتر
                 }
             }
     
@@ -231,7 +231,6 @@
     
             // --- ارسال وضعیت ویدیو ---
             function sendSyncData() {
-                // **رفع باگ ۲:** اگر در حال پردازش یک پیام دریافتی هستیم، داده جدید ارسال نمی‌کنیم
                 if (isSyncing || !partnerId || !videoPlayer.src) return;
                 
                 broadcastData({
@@ -243,7 +242,6 @@
                 });
             }
     
-            // رویدادها اکنون به تابع sendSyncData که دارای محافظ است، متصل هستند
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
             videoPlayer.addEventListener('seeked', sendSyncData);
@@ -252,7 +250,10 @@
     
             // --- همگام‌سازی دوره‌ای به عنوان پشتیبان ---
             setInterval(() => {
-                sendSyncData(); // این تابع اکنون محافظت شده است
+                // فقط اگر ویدیو در حال پخش باشد، داده ارسال کن تا با عملیات دستی کاربر تداخل نکند
+                if (!videoPlayer.paused) {
+                    sendSyncData();
+                }
     
                 const myDuration = videoPlayer.duration || null;
                 const warningDiv = document.getElementById('length-warning');
@@ -268,7 +269,7 @@
                 } else {
                     warningDiv.style.display = 'none';
                 }
-            }, 1000); // افزایش فاصله زمانی برای کاهش بار شبکه
+            }, 1000);
     
             // --- Event Listeners دیگر ---
             connectBtn.addEventListener('click', () => {
@@ -330,12 +331,11 @@
                 videoPlayer.textTracks[0].mode = 'showing';
             }
     
-            // **رفع باگ ۱:** استفاده از روش مطمئن‌تر برای کپی کردن
             myIdSpan.addEventListener('click', () => {
                 if (!myId) return;
                 const textArea = document.createElement('textarea');
                 textArea.value = myId;
-                textArea.style.position = 'fixed'; // جلوگیری از پرش صفحه
+                textArea.style.position = 'fixed';
                 textArea.style.left = '-9999px';
                 document.body.appendChild(textArea);
                 textArea.focus();
