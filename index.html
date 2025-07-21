@@ -53,6 +53,7 @@
                 <span id="connect-success-tick" class="hidden text-green-500 text-xl ml-2">✅</span>
                 <input type="text" id="partner-id-input" placeholder="شناسه دوستتان را وارد کنید" class="w-full sm:w-auto bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
                 <button id="connect-btn" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md transition-colors">اتصال</button>
+                <button id="disconnect-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors hidden">قطع اتصال</button>
             </div>
         </div>
         <!-- بخش چت -->
@@ -78,6 +79,7 @@
             const myIdSpan = document.getElementById('my-id');
             const partnerIdInput = document.getElementById('partner-id-input');
             const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
             const statusDiv = document.getElementById('status');
             const chatMessages = document.getElementById('chat-messages');
             const chatInput = document.getElementById('chat-input');
@@ -88,13 +90,14 @@
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsHost = window.location.host;
             const WS_URL = `${wsProtocol}//${wsHost}`;
-            console.log(`Connecting to WebSocket at: ${WS_URL}`);
-
+            
             let ws;
             let myId = '';
             let partnerId = '';
             let isSyncing = false; 
             let partnerVideoDuration = null;
+            let heartbeatInterval = null;
+            let lastPongReceivedTime = 0;
     
             // --- توابع اصلی ---
     
@@ -127,7 +130,6 @@
                 ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
-                        // **تغییر ۱:** ارسال شناسه فرستنده به تابع مدیریت داده
                         if (message.type === 'signal' && message.from) {
                             handleReceivedData(message.data, message.from);
                         }
@@ -138,6 +140,7 @@
     
                 ws.onclose = () => {
                     updateStatus('ارتباط با سرور قطع شد. تلاش مجدد...', 'error');
+                    resetConnectionState();
                     setTimeout(connectWebSocket, 3000);
                 };
     
@@ -146,43 +149,85 @@
                     updateStatus('خطا در ارتباط با سرور', 'error');
                 };
             }
-    
-            // **تغییر ۲:** یک تابع جدید برای ارسال داده به یک شناسه مشخص
+
             function sendDataTo(targetId, data) {
                 if (!ws || ws.readyState !== WebSocket.OPEN || !targetId) return;
                 ws.send(JSON.stringify({ type: 'signal', to: targetId, data }));
             }
 
             function broadcastData(data) {
-                // این تابع اکنون از تابع جدید استفاده می‌کند
                 sendDataTo(partnerId, data);
             }
+            
+            function resetConnectionState(reason = 'اتصال قطع شد') {
+                partnerId = '';
+                partnerIdInput.value = '';
+                updateStatus(reason, 'disconnected');
+                document.getElementById('connect-success-tick').classList.add('hidden');
+                connectBtn.classList.remove('hidden');
+                disconnectBtn.classList.add('hidden');
+                
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                }
+            }
+
+            function startHeartbeat() {
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                }
+                lastPongReceivedTime = Date.now();
+                
+                heartbeatInterval = setInterval(() => {
+                    if (!partnerId) {
+                        clearInterval(heartbeatInterval);
+                        return;
+                    }
+
+                    if (Date.now() - lastPongReceivedTime > 7000) {
+                        console.error("Heartbeat failed. Disconnecting.");
+                        resetConnectionState('ارتباط با طرف مقابل قطع شد');
+                        return;
+                    }
+                    sendDataTo(partnerId, { type: 'ping' });
+                }, 5000);
+            }
     
-            // **تغییر ۳:** بازنویسی تابع مدیریت داده برای اتصال خودکار
             function handleReceivedData(data, fromId) {
-                // پیام‌های مربوط به برقراری اتصال می‌توانند از هر کسی بیایند
+                if (data.type === 'ping') {
+                    sendDataTo(fromId, { type: 'pong' });
+                    return;
+                }
+
+                if (data.type === 'pong' && fromId === partnerId) {
+                    lastPongReceivedTime = Date.now();
+                    return;
+                }
+
                 if (data.type === 'connect_request') {
-                    // اتصال جدید برقرار می‌شود
                     partnerId = fromId;
-                    partnerIdInput.value = fromId; // شناسه طرف مقابل را در کادر وارد می‌کنیم
+                    partnerIdInput.value = fromId;
                     updateStatus(`متصل به: ${fromId}`, 'connected');
                     document.getElementById('connect-success-tick').classList.remove('hidden');
-                    // یک پیام تایید برای درخواست‌کننده ارسال می‌کنیم
+                    connectBtn.classList.add('hidden');
+                    disconnectBtn.classList.remove('hidden');
                     sendDataTo(fromId, { type: 'connect_confirm' });
+                    startHeartbeat();
                     return;
                 }
 
                 if (data.type === 'connect_confirm') {
-                    // درخواست اتصال ما توسط طرف مقابل تایید شده است
                     partnerId = fromId;
                     updateStatus(`اتصال با ${fromId} برقرار شد`, 'connected');
                     document.getElementById('connect-success-tick').classList.remove('hidden');
+                    connectBtn.classList.add('hidden');
+                    disconnectBtn.classList.remove('hidden');
+                    startHeartbeat();
                     return;
                 }
 
-                // برای تمام پیام‌های دیگر، مطمئن می‌شویم که از طرف مقابل متصل ارسال شده باشند
                 if (fromId !== partnerId) {
-                    console.warn(`پیام از شناسه ناشناس ${fromId} نادیده گرفته شد.`);
                     return;
                 }
 
@@ -191,9 +236,7 @@
                     return;
                 }
                 if (data.type === 'disconnect') {
-                    partnerId = '';
-                    updateStatus('اتصال توسط طرف مقابل قطع شد', 'disconnected');
-                    document.getElementById('connect-success-tick').classList.add('hidden');
+                    resetConnectionState('اتصال توسط طرف مقابل قطع شد');
                     return;
                 }
     
@@ -204,7 +247,7 @@
                         videoPlayer.currentTime = data.value;
                     }
                     if (data.playing && videoPlayer.paused) {
-                        videoPlayer.play().catch(e => console.error("Play was interrupted:", e));
+                        videoPlayer.play().catch(e => {});
                     } else if (!data.playing && !videoPlayer.paused) {
                         videoPlayer.pause();
                     }
@@ -217,7 +260,6 @@
                 }
             }
     
-            // --- بخش چت ---
             function appendChatMessage(text, isMe) {
                 const div = document.createElement('div');
                 div.textContent = text;
@@ -246,7 +288,6 @@
                 }
             });
     
-            // --- ارسال وضعیت ویدیو ---
             function sendSyncData() {
                 if (isSyncing || !partnerId || !videoPlayer.src) return;
                 broadcastData({
@@ -263,7 +304,6 @@
             videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
-            // --- بررسی دوره‌ای برای هشدار عدم تطابق طول ویدیو ---
             setInterval(() => {
                 const myDuration = videoPlayer.duration || null;
                 const warningDiv = document.getElementById('length-warning');
@@ -275,8 +315,6 @@
                 }
             }, 3000);
     
-            // --- Event Listeners دیگر ---
-            // **تغییر ۴:** دکمه اتصال اکنون یک درخواست ارسال می‌کند
             connectBtn.addEventListener('click', () => {
                 const idToConnect = partnerIdInput.value.trim();
                 if (!idToConnect) {
@@ -289,6 +327,13 @@
                 }
                 updateStatus(`درخواست اتصال به ${idToConnect} ارسال شد...`, 'connecting');
                 sendDataTo(idToConnect, { type: 'connect_request' });
+            });
+
+            disconnectBtn.addEventListener('click', () => {
+                if (partnerId) {
+                    sendDataTo(partnerId, { type: 'disconnect' });
+                }
+                resetConnectionState();
             });
     
             videoFileInput.addEventListener('change', (event) => {
@@ -352,7 +397,6 @@
                 document.body.removeChild(textArea);
             });
     
-            // --- شروع کار ---
             connectWebSocket();
         });
     </script>
