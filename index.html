@@ -21,9 +21,16 @@
             color: #fff;
             text-shadow: 1px 1px 2px black;
         }
+        /* **تغییر ۱:** استایل برای انیمیشن اعلان */
+        #fullscreen-notification {
+            transition: opacity 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+    <!-- **تغییر ۲:** عنصر اعلان جدید -->
+    <div id="fullscreen-notification" class="fixed top-5 right-5 bg-cyan-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 z-50" style="visibility: hidden;"></div>
+
     <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
         <div class="text-center">
             <h1 class="text-3xl font-bold text-cyan-400">🎬 دل‌پلیر: تماشای فیلم با هم</h1>
@@ -198,6 +205,23 @@
                     sendDataTo(partnerId, { type: 'ping' });
                 }, 5000);
             }
+
+            // **تغییر ۳:** تابع جدید برای نمایش اعلان
+            function showFullscreenNotification(message) {
+                const notification = document.getElementById('fullscreen-notification');
+                if (!notification) return;
+
+                notification.textContent = `پیام جدید: ${message}`;
+                notification.style.visibility = 'visible';
+                notification.style.opacity = '1';
+
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        notification.style.visibility = 'hidden';
+                    }, 500); // مطابق با زمان انیمیشن
+                }, 5000); // مدت زمان نمایش اعلان
+            }
     
             function handleReceivedData(data, fromId) {
                 if (data.type === 'ping') {
@@ -238,6 +262,10 @@
 
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
+                    // **تغییر ۴:** بررسی حالت تمام‌صفحه و نمایش اعلان
+                    if (document.fullscreenElement) {
+                        showFullscreenNotification(data.message);
+                    }
                     return;
                 }
                 if (data.type === 'disconnect') {
