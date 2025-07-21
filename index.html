@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دل‌پلیر</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎬</text></svg>">
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        video::-webkit-media-controls-timeline {
+            background-color: rgba(0, 123, 255, 0.5);
+            border-radius: 4px;
+            height: 8px;
+        }
+        video::-webkit-media-controls-current-time-display,
+        video::-webkit-media-controls-time-remaining-display {
+            color: #fff;
+            text-shadow: 1px 1px 2px black;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-cyan-400">🎬 دل‌پلیر: تماشای فیلم با هم</h1>
+            <p class="text-gray-400 mt-2">فایل ویدیویی خود را انتخاب کنید، شناسه خود را به دوستتان بدهید و بعد شناسه او را برای اتصال وارد کنید.</p>
+        </div>
+        <div class="flex justify-center flex-col items-center">
+            <label for="video-file-input" class="w-full sm:w-auto flex items-center justify-center px-6 py-3 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 hover:border-cyan-400 transition-colors">
+                <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="ml-3 text-lg font-medium">انتخاب فایل ویدیو</span>
+            </label>
+            <input type="file" id="video-file-input" accept="video/*,.mkv" class="hidden">
+
+            <label for="subtitle-file-input" class="w-full sm:w-auto flex items-center justify-center px-6 py-3 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 hover:border-cyan-400 transition-colors mt-2">
+                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 17l4 4 4-4m0-5V3m-8 4v2a4 4 0 004 4h4"></path></svg>
+                <span class="ml-3 text-md font-medium">انتخاب زیرنویس (SRT یا VTT)</span>
+            </label>
+            <input type="file" id="subtitle-file-input" accept=".vtt,.srt" class="hidden">
+        </div>
+        <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+        <div class="bg-gray-900 p-4 rounded-lg space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+            <div class="text-center md:text-right">
+                <span class="text-gray-400">شناسه شما:</span>
+                <span id="my-id" class="font-mono bg-gray-700 text-cyan-300 px-3 py-1 rounded-md cursor-pointer" title="برای کپی کلیک کنید">در حال بارگذاری...</span>
+                <span id="copy-hint" class="text-green-400 text-xs ml-2" style="display:none"></span>
+            </div>
+            <div class="flex flex-col sm:flex-row items-center gap-2 justify-center">
+                <span id="connect-success-tick" class="hidden text-green-500 text-xl ml-2">✅</span>
+                <input type="text" id="partner-id-input" placeholder="شناسه دوستتان را وارد کنید" class="w-full sm:w-auto bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <button id="connect-btn" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-md transition-colors">اتصال</button>
+            </div>
+        </div>
+        <!-- بخش چت -->
+        <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
+            <div class="mb-2 font-bold text-cyan-400">💬 چت</div>
+            <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
+            <div class="flex gap-2">
+                <input id="chat-input" type="text" class="flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید...">
+                <button id="chat-send" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-1 rounded-md">ارسال</button>
+            </div>
+        </div>
+        <div id="length-warning" class="text-center font-bold text-red-500 mb-2" style="display:none"></div>
+        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
+            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
+        </div>
+        <div id="debug" class="text-xs text-gray-500 bg-gray-800 p-3 rounded-lg">
+            <div class="mb-2"><strong>وضعیت اتصال:</strong></div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <div>
+                    <span class="text-gray-400">وضعیت پخش شما:</span>
+                    <span id="my-play-status" class="text-cyan-300">-</span>
+                </div>
+                <div>
+                    <span class="text-gray-400">وضعیت پخش طرف مقابل:</span>
+                    <span id="partner-play-status" class="text-green-300">-</span>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 mt-1">
+                <div>
+                    <span class="text-gray-400">ثانیه پخش شما:</span>
+                    <span id="my-play-time" class="text-cyan-300">-</span>
+                </div>
+                <div>
+                    <span class="text-gray-400">ثانیه پخش طرف مقابل:</span>
+                    <span id="partner-play-time" class="text-green-300">-</span>
+                </div>
+            </div>
+            <div class="mt-2 flex gap-2">
+                <button id="clear-connections" class="bg-red-300 hover:bg-red-500 px-3 py-1 rounded text-xs ml-2">قطع اتصال</button>
+                <button id="test-connection" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-xs">تست اتصال</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        window.addEventListener('load', () => {
+            // --- انتخاب عناصر DOM ---
+            const videoPlayer = document.getElementById('my-video');
+            const videoFileInput = document.getElementById('video-file-input');
+            const subtitleFileInput = document.getElementById('subtitle-file-input');
+            const myIdSpan = document.getElementById('my-id');
+            const partnerIdInput = document.getElementById('partner-id-input');
+            const connectBtn = document.getElementById('connect-btn');
+            const statusDiv = document.getElementById('status');
+            const myPlayStatus = document.getElementById('my-play-status');
+            const partnerPlayStatus = document.getElementById('partner-play-status');
+            const myPlayTime = document.getElementById('my-play-time');
+            const partnerPlayTime = document.getElementById('partner-play-time');
+            const clearConnectionsBtn = document.getElementById('clear-connections');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatInput = document.getElementById('chat-input');
+            const chatSend = document.getElementById('chat-send');
+            const copyHint = document.getElementById('copy-hint');
+    
+            // --- متغیرهای وضعیت ---
+            let WS = 'ws://192.168.203.118:8080';
+            let ws;
+            let myId = '';
+            let partnerId = '';
+            let isSyncing = false;
+            let partnerVideoDuration = null;
+    
+            // --- توابع اصلی ---
+    
+            function randomId() {
+                return Math.random().toString(36).substring(2, 9);
+            }
+    
+            function updateStatus(message, type) {
+                const statusClasses = {
+                    success: 'bg-green-600 text-white',
+                    connected: 'bg-cyan-600 text-white',
+                    error: 'bg-red-600 text-white',
+                    disconnected: 'bg-gray-700 text-yellow-400',
+                    connecting: 'bg-yellow-500 text-black'
+                }; 
+                const className = statusClasses[type] || 'bg-gray-700 text-yellow-400';
+                statusDiv.innerHTML = `<span class="${className} px-4 py-1 rounded-full">${message}</span>`;
+            }
+    
+            function connectWebSocket() {
+                ws = new WebSocket(WS);
+    
+                ws.onopen = () => {
+                    myId = randomId();
+                    myIdSpan.textContent = myId;
+                    ws.send(JSON.stringify({ type: 'register', id: myId }));
+                    updateStatus(`آماده - شناسه شما: ${myId}`, 'success');
+                };
+    
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'signal' && message.from) {
+                            handleReceivedData(message.data);
+                        }
+                    } catch (error) {
+                        console.error("Error parsing message:", error);
+                    }
+                };
+    
+                ws.onclose = () => {
+                    updateStatus('ارتباط با سرور قطع شد. تلاش مجدد...', 'error');
+                    setTimeout(connectWebSocket, 3000);
+                };
+    
+                ws.onerror = (error) => {
+                    console.error('WebSocket Error:', error);
+                    updateStatus('خطا در ارتباط با سرور', 'error');
+                };
+            }
+    
+            function broadcastData(data) {
+                if (!ws || ws.readyState !== WebSocket.OPEN || !partnerId) return;
+                ws.send(JSON.stringify({ type: 'signal', to: partnerId, data }));
+            }
+    
+            function handleReceivedData(data) {
+                if (data.type === 'chat') {
+                    appendChatMessage(data.message, false);
+                    return;
+                }
+                if (data.type === 'disconnect') {
+                    partnerId = '';
+                    partnerPlayStatus.textContent = '-';
+                    partnerPlayTime.textContent = '-';
+                    updateStatus('اتصال توسط طرف مقابل قطع شد', 'disconnected');
+                    document.getElementById('connect-success-tick').classList.add('hidden');
+                    return;
+                }
+                if (data.type === 'test-connection') {
+                    broadcastData({ type: 'test-connection-response' });
+                    return;
+                }
+    
+                if (data.type === 'sync') {
+                    isSyncing = true;
+                    partnerPlayStatus.textContent = data.playing ? 'در حال پخش' : 'متوقف';
+                    partnerPlayTime.textContent = Number(data.value).toFixed(2);
+                    partnerVideoDuration = data.duration || null;
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 0.7) {
+                        videoPlayer.currentTime = data.value;
+                    }
+                    if (data.playing && videoPlayer.paused) {
+                        videoPlayer.play().catch(e => {});
+                    } else if (!data.playing && !videoPlayer.paused) {
+                        videoPlayer.pause();
+                    }
+    
+                    // ✅ بخش ۱: سرعت پخش ویدیو را همگام‌سازی کن
+                    if (data.rate && videoPlayer.playbackRate !== data.rate) {
+                        videoPlayer.playbackRate = data.rate;
+                    }
+    
+                    setTimeout(() => { isSyncing = false; }, 100);
+                }
+            }
+    
+            // --- بخش چت ---
+            function appendChatMessage(text, isMe) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                div.style.direction = 'rtl';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex w-full ' + (isMe ? 'justify-end' : 'justify-start');
+    
+                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe
+                    ? 'bg-cyan-600 text-white rounded-br-lg'
+                    : 'bg-gray-700 text-white rounded-bl-lg'
+                }`;
+                
+                wrapper.appendChild(div);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+    
+            function sendChatMessage() {
+                const msg = chatInput.value.trim();
+                if (!msg) return;
+                appendChatMessage(msg, true);
+                broadcastData({ type: 'chat', message: msg });
+                chatInput.value = '';
+            }
+            
+            chatSend.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+    
+            // --- ارسال وضعیت ویدیو ---
+            function sendSyncData() {
+                if (!partnerId || !videoPlayer.src) return;
+                broadcastData({
+                    type: 'sync',
+                    playing: !videoPlayer.paused,
+                    value: videoPlayer.currentTime,
+                    duration: videoPlayer.duration || 0,
+                    rate: videoPlayer.playbackRate // ✅ بخش ۲: سرعت پخش را در پیام ارسالی بگنجان
+                });
+            }
+    
+            videoPlayer.addEventListener('play', () => { if (isSyncing) return; sendSyncData(); });
+            videoPlayer.addEventListener('pause', () => { if (isSyncing) return; sendSyncData(); });
+            videoPlayer.addEventListener('seeked', () => { if (isSyncing) return; sendSyncData(); });
+            // ✅ بخش ۳: یک شنونده برای رویداد تغییر سرعت پخش اضافه کن
+            videoPlayer.addEventListener('ratechange', () => { if (isSyncing) return; sendSyncData(); });
+    
+    
+            // --- همگام‌سازی دوره‌ای به عنوان پشتیبان ---
+            setInterval(() => {
+                if (partnerId && videoPlayer.src) {
+                    sendSyncData();
+                }
+                myPlayStatus.textContent = videoPlayer.paused ? 'متوقف' : 'در حال پخش';
+                myPlayTime.textContent = videoPlayer.currentTime.toFixed(2);
+    
+                const myDuration = videoPlayer.duration || null;
+                const warningDiv = document.getElementById('length-warning');
+                if (
+                    partnerId &&
+                    videoPlayer.src &&
+                    partnerVideoDuration !== null &&
+                    myDuration !== null &&
+                    Math.abs(myDuration - partnerVideoDuration) > 0.5
+                ) {
+                    warningDiv.textContent = '⚠️ طول ویدیوی شما و طرف مقابل یکسان نیست. لطفاً هر دو یک فایل یکسان انتخاب کنید.';
+                    warningDiv.style.display = 'block';
+                } else {
+                    warningDiv.style.display = 'none';
+                }
+            }, 500);
+    
+            // --- Event Listeners دیگر ---
+            connectBtn.addEventListener('click', () => {
+                const id = partnerIdInput.value.trim();
+                if (!id) {
+                    alert('لطفا شناسه دوستتان را وارد کنید.');
+                    return;
+                }
+                if (id === myId) {
+                    alert('نمی‌توانید به خودتان متصل شوید.');
+                    return;
+                }
+                partnerId = id;
+                updateStatus(`متصل به: ${partnerId}`, 'connected');
+                document.getElementById('connect-success-tick').classList.remove('hidden');
+                // ارسال شناسه خودمان به طرف مقابل در چت
+                broadcastData({ type: 'chat', message: `شناسه من: ${myId}` });
+            });
+    
+            videoFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const fileURL = URL.createObjectURL(file);
+                    videoPlayer.src = fileURL;
+                    updateStatus(`فایل بارگذاری شد: ${file.name}`, 'success');
+                }
+            });
+    
+            subtitleFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const oldTrack = videoPlayer.querySelector('track');
+                if(oldTrack) oldTrack.remove();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    let content = e.target.result;
+                    let url;
+                    if (file.name.endsWith('.srt')) {
+                        const vttContent = 'WEBVTT\n\n' + content
+                            .replace(/\r/g, '')
+                            .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+                            .replace(/^\d+$/gm, '');
+                        const blob = new Blob([vttContent], { type: 'text/vtt' });
+                        url = URL.createObjectURL(blob);
+                    } else {
+                        url = URL.createObjectURL(file);
+                    }
+                    addSubtitleTrack(url, 'fa', 'فارسی');
+                };
+                reader.readAsText(file);
+            });
+    
+            function addSubtitleTrack(url, lang, label) {
+                const track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.label = label;
+                track.srclang = lang;
+                track.src = url;
+                track.default = true;
+                videoPlayer.appendChild(track);
+                videoPlayer.textTracks[0].mode = 'showing';
+            }
+    
+            myIdSpan.addEventListener('click', () => {
+                navigator.clipboard.writeText(myId).then(() => {
+                    copyHint.textContent = 'کپی شد!';
+                    copyHint.style.display = 'inline';
+                    setTimeout(() => { copyHint.style.display = 'none'; }, 2000);
+                });
+            });
+    
+            clearConnectionsBtn.addEventListener('click', () => {
+                if (partnerId) {
+                    broadcastData({ type: 'disconnect' });
+                }
+                partnerId = '';
+                partnerPlayStatus.textContent = '-';
+                partnerPlayTime.textContent = '-';
+                updateStatus('اتصال قطع شد', 'disconnected');
+                document.getElementById('connect-success-tick').classList.add('hidden');
+            });
+
+            document.getElementById('test-connection').addEventListener('click', () => {
+                if (!partnerId) {
+                    updateStatus('ابتدا به یک کاربر متصل شوید.', 'error');
+                    return;
+                }
+                let responded = false;
+                function handleTestResponse(data) {
+                    if (data.type === 'test-connection-response') {
+                        responded = true;
+                        updateStatus('اتصال برقرار است ✅', 'success');
+                        // حذف لیسنر موقت
+                        ws.removeEventListener('message', onWsMessage);
+                    }
+                }
+                function onWsMessage(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'signal' && message.from) {
+                            handleTestResponse(message.data);
+                        }
+                    } catch {}
+                }
+                ws.addEventListener('message', onWsMessage);
+                broadcastData({ type: 'test-connection' });
+                updateStatus('در حال بررسی اتصال...', 'connecting');
+                setTimeout(() => {
+                    if (!responded) {
+                        updateStatus('اتصال برقرار نیست یا طرف مقابل آفلاین است.', 'error');
+                        ws.removeEventListener('message', onWsMessage);
+                    }
+                }, 2000);
+            });
+    
+            // --- شروع کار ---
+            connectWebSocket();
+        });
+    </script>
+</body>
+</html>
