@@ -127,8 +127,9 @@
                 ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
+                        // **تغییر ۱:** ارسال شناسه فرستنده به تابع مدیریت داده
                         if (message.type === 'signal' && message.from) {
-                            handleReceivedData(message.data);
+                            handleReceivedData(message.data, message.from);
                         }
                     } catch (error) {
                         console.error("Error parsing message:", error);
@@ -146,12 +147,45 @@
                 };
             }
     
+            // **تغییر ۲:** یک تابع جدید برای ارسال داده به یک شناسه مشخص
+            function sendDataTo(targetId, data) {
+                if (!ws || ws.readyState !== WebSocket.OPEN || !targetId) return;
+                ws.send(JSON.stringify({ type: 'signal', to: targetId, data }));
+            }
+
             function broadcastData(data) {
-                if (!ws || ws.readyState !== WebSocket.OPEN || !partnerId) return;
-                ws.send(JSON.stringify({ type: 'signal', to: partnerId, data }));
+                // این تابع اکنون از تابع جدید استفاده می‌کند
+                sendDataTo(partnerId, data);
             }
     
-            function handleReceivedData(data) {
+            // **تغییر ۳:** بازنویسی تابع مدیریت داده برای اتصال خودکار
+            function handleReceivedData(data, fromId) {
+                // پیام‌های مربوط به برقراری اتصال می‌توانند از هر کسی بیایند
+                if (data.type === 'connect_request') {
+                    // اتصال جدید برقرار می‌شود
+                    partnerId = fromId;
+                    partnerIdInput.value = fromId; // شناسه طرف مقابل را در کادر وارد می‌کنیم
+                    updateStatus(`متصل به: ${fromId}`, 'connected');
+                    document.getElementById('connect-success-tick').classList.remove('hidden');
+                    // یک پیام تایید برای درخواست‌کننده ارسال می‌کنیم
+                    sendDataTo(fromId, { type: 'connect_confirm' });
+                    return;
+                }
+
+                if (data.type === 'connect_confirm') {
+                    // درخواست اتصال ما توسط طرف مقابل تایید شده است
+                    partnerId = fromId;
+                    updateStatus(`اتصال با ${fromId} برقرار شد`, 'connected');
+                    document.getElementById('connect-success-tick').classList.remove('hidden');
+                    return;
+                }
+
+                // برای تمام پیام‌های دیگر، مطمئن می‌شویم که از طرف مقابل متصل ارسال شده باشند
+                if (fromId !== partnerId) {
+                    console.warn(`پیام از شناسه ناشناس ${fromId} نادیده گرفته شد.`);
+                    return;
+                }
+
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
                     return;
@@ -165,26 +199,21 @@
     
                 if (data.type === 'sync') {
                     isSyncing = true;
-                    
                     partnerVideoDuration = data.duration || null;
-                    
                     if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
                         videoPlayer.currentTime = data.value;
                     }
-
                     if (data.playing && videoPlayer.paused) {
                         videoPlayer.play().catch(e => console.error("Play was interrupted:", e));
                     } else if (!data.playing && !videoPlayer.paused) {
                         videoPlayer.pause();
                     }
-    
                     if (data.rate && videoPlayer.playbackRate !== data.rate) {
                         videoPlayer.playbackRate = data.rate;
                     }
-    
                     setTimeout(() => {
                         isSyncing = false;
-                    }, 200); // افزایش زمان برای اطمینان بیشتر
+                    }, 200);
                 }
             }
     
@@ -195,12 +224,7 @@
                 div.style.direction = 'rtl';
                 const wrapper = document.createElement('div');
                 wrapper.className = 'flex w-full ' + (isMe ? 'justify-end' : 'justify-start');
-    
-                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe
-                    ? 'bg-cyan-600 text-white rounded-br-lg'
-                    : 'bg-gray-700 text-white rounded-bl-lg'
-                }`;
-                
+                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
                 wrapper.appendChild(div);
                 chatMessages.appendChild(wrapper);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -225,7 +249,6 @@
             // --- ارسال وضعیت ویدیو ---
             function sendSyncData() {
                 if (isSyncing || !partnerId || !videoPlayer.src) return;
-                
                 broadcastData({
                     type: 'sync',
                     playing: !videoPlayer.paused,
@@ -240,39 +263,32 @@
             videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
-    
             // --- بررسی دوره‌ای برای هشدار عدم تطابق طول ویدیو ---
             setInterval(() => {
                 const myDuration = videoPlayer.duration || null;
                 const warningDiv = document.getElementById('length-warning');
-                if (
-                    partnerId &&
-                    videoPlayer.src &&
-                    partnerVideoDuration !== null &&
-                    myDuration !== null &&
-                    Math.abs(myDuration - partnerVideoDuration) > 0.5
-                ) {
+                if (partnerId && videoPlayer.src && partnerVideoDuration !== null && myDuration !== null && Math.abs(myDuration - partnerVideoDuration) > 0.5) {
                     warningDiv.textContent = '⚠️ طول ویدیوی شما و طرف مقابل یکسان نیست. لطفاً هر دو یک فایل یکسان انتخاب کنید.';
                     warningDiv.style.display = 'block';
                 } else {
                     warningDiv.style.display = 'none';
                 }
-            }, 3000); // این کار را هر ۳ ثانیه یکبار انجام بده
+            }, 3000);
     
             // --- Event Listeners دیگر ---
+            // **تغییر ۴:** دکمه اتصال اکنون یک درخواست ارسال می‌کند
             connectBtn.addEventListener('click', () => {
-                const id = partnerIdInput.value.trim();
-                if (!id) {
+                const idToConnect = partnerIdInput.value.trim();
+                if (!idToConnect) {
                     alert('لطفا شناسه دوستتان را وارد کنید.');
                     return;
                 }
-                if (id === myId) {
+                if (idToConnect === myId) {
                     alert('نمی‌توانید به خودتان متصل شوید.');
                     return;
                 }
-                partnerId = id;
-                updateStatus(`متصل به: ${partnerId}`, 'connected');
-                document.getElementById('connect-success-tick').classList.remove('hidden');
+                updateStatus(`درخواست اتصال به ${idToConnect} ارسال شد...`, 'connecting');
+                sendDataTo(idToConnect, { type: 'connect_request' });
             });
     
             videoFileInput.addEventListener('change', (event) => {
@@ -294,10 +310,7 @@
                     let content = e.target.result;
                     let url;
                     if (file.name.endsWith('.srt')) {
-                        const vttContent = 'WEBVTT\n\n' + content
-                            .replace(/\r/g, '')
-                            .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
-                            .replace(/^\d+$/gm, '');
+                        const vttContent = 'WEBVTT\n\n' + content.replace(/\r/g, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2').replace(/^\d+$/gm, '');
                         const blob = new Blob([vttContent], { type: 'text/vtt' });
                         url = URL.createObjectURL(blob);
                     } else {
