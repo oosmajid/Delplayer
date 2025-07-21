@@ -100,8 +100,9 @@
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
-            // **تغییر ۱:** ایجاد زمینه صوتی برای اعلان
             let audioCtx;
+            // **تغییر ۱:** پرچم برای تشخیص قطع اتصال عمدی
+            let manualDisconnect = false;
 
             // --- توابع اصلی ---
     
@@ -142,15 +143,28 @@
                     }
                 };
     
+                // **تغییر ۲:** منطق بهبود یافته برای مدیریت تمام انواع قطع اتصال
                 ws.onclose = () => {
-                    updateStatus('ارتباط با سرور قطع شد. تلاش مجدد...', 'error');
-                    resetConnectionState();
-                    setTimeout(connectWebSocket, 3000);
+                    if (heartbeatInterval) {
+                        clearInterval(heartbeatInterval);
+                        heartbeatInterval = null;
+                    }
+                    
+                    const message = manualDisconnect 
+                        ? 'اتصال قطع شد. در حال دریافت شناسه جدید...' 
+                        : 'ارتباط با سرور قطع شد. در حال اتصال مجدد...';
+                    const type = manualDisconnect ? 'disconnected' : 'error';
+                    
+                    updateStatus(message, type);
+                    resetConnectionState(false); // ریست کردن UI بدون نمایش پیام اضافه
+                    
+                    setTimeout(connectWebSocket, 3000); // تلاش برای اتصال مجدد
+                    manualDisconnect = false; // ریست کردن پرچم
                 };
     
                 ws.onerror = (error) => {
                     console.error('WebSocket Error:', error);
-                    updateStatus('خطا در ارتباط با سرور', 'error');
+                    // رویداد onclose بلافاصله بعد از این فراخوانی می‌شود، پس مدیریت اصلی آنجا انجام می‌شود
                 };
             }
 
@@ -163,15 +177,23 @@
                 sendDataTo(partnerId, data);
             }
             
-            function resetConnectionState(reason = 'اتصال قطع شد') {
+            function resetConnectionState(showMessage = true, reason = 'اتصال قطع شد') {
                 videoPlayer.pause();
                 if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                    document.exitFullscreen().catch(err => {});
                 }
 
                 partnerId = '';
                 partnerIdInput.value = '';
-                updateStatus(reason, 'disconnected');
+                
+                if (showMessage) {
+                    updateStatus(reason, 'disconnected');
+                }
+                
+                // **تغییر ۳:** شناسه محلی نیز هنگام ریست شدن پاک می‌شود تا مشخص شود در حال تغییر است
+                myId = '';
+                myIdSpan.textContent = 'در حال دریافت...';
+
                 document.getElementById('connect-success-tick').classList.add('hidden');
                 connectBtn.classList.remove('hidden');
                 disconnectBtn.classList.add('hidden');
@@ -196,16 +218,14 @@
 
                     if (Date.now() - lastPongReceivedTime > 7000) {
                         console.error("Heartbeat failed. Disconnecting.");
-                        resetConnectionState('ارتباط با طرف مقابل قطع شد');
+                        resetConnectionState(true, 'ارتباط با طرف مقابل قطع شد');
                         return;
                     }
                     sendDataTo(partnerId, { type: 'ping' });
                 }, 5000);
             }
 
-            // **تغییر ۲:** تابع جدید برای پخش صدای اعلان
             function playNotificationSound() {
-                // زمینه صوتی فقط یک بار و در پاسخ به تعامل کاربر ایجاد می‌شود
                 if (!audioCtx) {
                     try {
                         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -214,25 +234,18 @@
                         return;
                     }
                 }
-
-                // اگر زمینه صوتی به حالت تعلیق درآمده باشد، آن را ادامه می‌دهیم
                 if (audioCtx.state === 'suspended') {
                     audioCtx.resume();
                 }
-
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
-
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-
-                gainNode.gain.value = 0.1; // کاهش ولوم برای جلوگیری از صدای بلند
-                oscillator.frequency.value = 880; // فرکانس نت لا (A5)
+                gainNode.gain.value = 0.1;
+                oscillator.frequency.value = 880;
                 oscillator.type = 'sine';
-
                 const now = audioCtx.currentTime;
                 oscillator.start(now);
-                // صدا را پس از ۰.۲ ثانیه متوقف می‌کنیم
                 oscillator.stop(now + 0.2);
             }
     
@@ -275,12 +288,11 @@
 
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
-                    // **تغییر ۳:** پخش صدای اعلان هنگام دریافت پیام
                     playNotificationSound();
                     return;
                 }
                 if (data.type === 'disconnect') {
-                    resetConnectionState('اتصال توسط طرف مقابل قطع شد');
+                    resetConnectionState(true, 'اتصال توسط طرف مقابل قطع شد');
                     return;
                 }
     
@@ -373,11 +385,15 @@
                 sendDataTo(idToConnect, { type: 'connect_request' });
             });
 
+            // **تغییر ۴:** دکمه قطع اتصال اکنون اتصال را می‌بندد تا رویداد onclose اجرا شود
             disconnectBtn.addEventListener('click', () => {
                 if (partnerId) {
                     sendDataTo(partnerId, { type: 'disconnect' });
                 }
-                resetConnectionState();
+                manualDisconnect = true;
+                if (ws) {
+                    ws.close();
+                }
             });
     
             videoFileInput.addEventListener('change', (event) => {
