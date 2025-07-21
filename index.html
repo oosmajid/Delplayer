@@ -27,7 +27,7 @@
     <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
         <div class="text-center">
             <h1 class="text-3xl font-bold text-cyan-400">🎬 دل‌پلیر: تماشای فیلم با هم</h1>
-            <p class="text-gray-400 mt-2">فایل ویدیویی خود را انتخاب کنید، شناسه خود را به دوستتان بدهید یا شناسه او را برای اتصال وارد کنید.</p>
+            <p class="text-gray-400 mt-2">فایل ویدیویی خود را انتخاب کنید، شناسه خود را به دوستتان بدهید و بعد شناسه او را برای اتصال وارد کنید.</p>
         </div>
         <div class="flex justify-center flex-col items-center">
             <label for="video-file-input" class="w-full sm:w-auto flex items-center justify-center px-6 py-3 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 hover:border-cyan-400 transition-colors">
@@ -160,6 +160,11 @@
             }
             
             function resetConnectionState(reason = 'اتصال قطع شد') {
+                videoPlayer.pause();
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                }
+
                 partnerId = '';
                 partnerIdInput.value = '';
                 updateStatus(reason, 'disconnected');
