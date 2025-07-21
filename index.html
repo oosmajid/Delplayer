@@ -42,7 +42,9 @@
             </label>
             <input type="file" id="subtitle-file-input" accept=".vtt,.srt" class="hidden">
         </div>
+        
         <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+
         <div class="bg-gray-900 p-4 rounded-lg space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
             <div class="text-center md:text-right">
                 <span class="text-gray-400">شناسه شما:</span>
@@ -98,7 +100,9 @@
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
-    
+            // **تغییر ۱:** ایجاد زمینه صوتی برای اعلان
+            let audioCtx;
+
             // --- توابع اصلی ---
     
             function randomId() {
@@ -198,6 +202,39 @@
                     sendDataTo(partnerId, { type: 'ping' });
                 }, 5000);
             }
+
+            // **تغییر ۲:** تابع جدید برای پخش صدای اعلان
+            function playNotificationSound() {
+                // زمینه صوتی فقط یک بار و در پاسخ به تعامل کاربر ایجاد می‌شود
+                if (!audioCtx) {
+                    try {
+                        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    } catch (e) {
+                        console.error("Web Audio API is not supported in this browser");
+                        return;
+                    }
+                }
+
+                // اگر زمینه صوتی به حالت تعلیق درآمده باشد، آن را ادامه می‌دهیم
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                gainNode.gain.value = 0.1; // کاهش ولوم برای جلوگیری از صدای بلند
+                oscillator.frequency.value = 880; // فرکانس نت لا (A5)
+                oscillator.type = 'sine';
+
+                const now = audioCtx.currentTime;
+                oscillator.start(now);
+                // صدا را پس از ۰.۲ ثانیه متوقف می‌کنیم
+                oscillator.stop(now + 0.2);
+            }
     
             function handleReceivedData(data, fromId) {
                 if (data.type === 'ping') {
@@ -238,6 +275,8 @@
 
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
+                    // **تغییر ۳:** پخش صدای اعلان هنگام دریافت پیام
+                    playNotificationSound();
                     return;
                 }
                 if (data.type === 'disconnect') {
