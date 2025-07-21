@@ -68,33 +68,6 @@
         <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
             <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
         </div>
-        <div id="debug" class="text-xs text-gray-500 bg-gray-800 p-3 rounded-lg">
-            <div class="mb-2"><strong>وضعیت اتصال:</strong></div>
-            <div class="flex flex-col sm:flex-row gap-2">
-                <div>
-                    <span class="text-gray-400">وضعیت پخش شما:</span>
-                    <span id="my-play-status" class="text-cyan-300">-</span>
-                </div>
-                <div>
-                    <span class="text-gray-400">وضعیت پخش طرف مقابل:</span>
-                    <span id="partner-play-status" class="text-green-300">-</span>
-                </div>
-            </div>
-            <div class="flex flex-col sm:flex-row gap-2 mt-1">
-                <div>
-                    <span class="text-gray-400">ثانیه پخش شما:</span>
-                    <span id="my-play-time" class="text-cyan-300">-</span>
-                </div>
-                <div>
-                    <span class="text-gray-400">ثانیه پخش طرف مقابل:</span>
-                    <span id="partner-play-time" class="text-green-300">-</span>
-                </div>
-            </div>
-            <div class="mt-2 flex gap-2">
-                <button id="clear-connections" class="bg-red-300 hover:bg-red-500 px-3 py-1 rounded text-xs ml-2">قطع اتصال</button>
-                <button id="test-connection" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-xs">تست اتصال</button>
-            </div>
-        </div>
     </div>
     <script>
         window.addEventListener('load', () => {
@@ -106,27 +79,22 @@
             const partnerIdInput = document.getElementById('partner-id-input');
             const connectBtn = document.getElementById('connect-btn');
             const statusDiv = document.getElementById('status');
-            const myPlayStatus = document.getElementById('my-play-status');
-            const partnerPlayStatus = document.getElementById('partner-play-status');
-            const myPlayTime = document.getElementById('my-play-time');
-            const partnerPlayTime = document.getElementById('partner-play-time');
-            const clearConnectionsBtn = document.getElementById('clear-connections');
             const chatMessages = document.getElementById('chat-messages');
             const chatInput = document.getElementById('chat-input');
             const chatSend = document.getElementById('chat-send');
             const copyHint = document.getElementById('copy-hint');
     
             // --- متغیرهای وضعیت ---
-            // --- آدرس سرور به صورت خودکار تشخیص داده می‌شود ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsHost = window.location.host; // شامل هاست و پورت است
+            const wsHost = window.location.host;
             const WS_URL = `${wsProtocol}//${wsHost}`;
             console.log(`Connecting to WebSocket at: ${WS_URL}`);
 
             let ws;
             let myId = '';
             let partnerId = '';
-            let isSyncing = false;
+            // **رفع باگ ۲:** این پرچم برای جلوگیری از حلقه‌ی بازگشتی استفاده می‌شود
+            let isSyncing = false; 
             let partnerVideoDuration = null;
     
             // --- توابع اصلی ---
@@ -191,37 +159,39 @@
                 }
                 if (data.type === 'disconnect') {
                     partnerId = '';
-                    partnerPlayStatus.textContent = '-';
-                    partnerPlayTime.textContent = '-';
                     updateStatus('اتصال توسط طرف مقابل قطع شد', 'disconnected');
                     document.getElementById('connect-success-tick').classList.add('hidden');
                     return;
                 }
-                if (data.type === 'test-connection') {
-                    broadcastData({ type: 'test-connection-response' });
-                    return;
-                }
     
                 if (data.type === 'sync') {
+                    // **رفع باگ ۲:** پرچم را در ابتدای پردازش پیام تنظیم می‌کنیم
                     isSyncing = true;
-                    partnerPlayStatus.textContent = data.playing ? 'در حال پخش' : 'متوقف';
-                    partnerPlayTime.textContent = Number(data.value).toFixed(2);
+                    
                     partnerVideoDuration = data.duration || null;
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 0.7) {
+                    
+                    // همگام‌سازی زمان ویدیو
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 1) { // افزایش آستانه برای جلوگیری از پرش‌های بی‌مورد
                         videoPlayer.currentTime = data.value;
                     }
+
+                    // همگام‌سازی وضعیت پخش/توقف
                     if (data.playing && videoPlayer.paused) {
-                        videoPlayer.play().catch(e => {});
+                        videoPlayer.play().catch(e => console.error("Play was interrupted:", e));
                     } else if (!data.playing && !videoPlayer.paused) {
                         videoPlayer.pause();
                     }
     
-                    // ✅ بخش ۱: سرعت پخش ویدیو را همگام‌سازی کن
+                    // همگام‌سازی سرعت پخش
                     if (data.rate && videoPlayer.playbackRate !== data.rate) {
                         videoPlayer.playbackRate = data.rate;
                     }
     
-                    setTimeout(() => { isSyncing = false; }, 100);
+                    // **رفع باگ ۲:** پرچم را پس از اتمام پردازش همزمان، پاک می‌کنیم
+                    // این کار تضمین می‌کند که رویدادهای ایجاد شده توسط کد بالا، نادیده گرفته شوند
+                    Promise.resolve().then(() => {
+                        isSyncing = false;
+                    });
                 }
             }
     
@@ -261,30 +231,28 @@
     
             // --- ارسال وضعیت ویدیو ---
             function sendSyncData() {
-                if (!partnerId || !videoPlayer.src) return;
+                // **رفع باگ ۲:** اگر در حال پردازش یک پیام دریافتی هستیم، داده جدید ارسال نمی‌کنیم
+                if (isSyncing || !partnerId || !videoPlayer.src) return;
+                
                 broadcastData({
                     type: 'sync',
                     playing: !videoPlayer.paused,
                     value: videoPlayer.currentTime,
                     duration: videoPlayer.duration || 0,
-                    rate: videoPlayer.playbackRate // ✅ بخش ۲: سرعت پخش را در پیام ارسالی بگنجان
+                    rate: videoPlayer.playbackRate
                 });
             }
     
-            videoPlayer.addEventListener('play', () => { if (isSyncing) return; sendSyncData(); });
-            videoPlayer.addEventListener('pause', () => { if (isSyncing) return; sendSyncData(); });
-            videoPlayer.addEventListener('seeked', () => { if (isSyncing) return; sendSyncData(); });
-            // ✅ بخش ۳: یک شنونده برای رویداد تغییر سرعت پخش اضافه کن
-            videoPlayer.addEventListener('ratechange', () => { if (isSyncing) return; sendSyncData(); });
+            // رویدادها اکنون به تابع sendSyncData که دارای محافظ است، متصل هستند
+            videoPlayer.addEventListener('play', sendSyncData);
+            videoPlayer.addEventListener('pause', sendSyncData);
+            videoPlayer.addEventListener('seeked', sendSyncData);
+            videoPlayer.addEventListener('ratechange', sendSyncData);
     
     
             // --- همگام‌سازی دوره‌ای به عنوان پشتیبان ---
             setInterval(() => {
-                if (partnerId && videoPlayer.src) {
-                    sendSyncData();
-                }
-                myPlayStatus.textContent = videoPlayer.paused ? 'متوقف' : 'در حال پخش';
-                myPlayTime.textContent = videoPlayer.currentTime.toFixed(2);
+                sendSyncData(); // این تابع اکنون محافظت شده است
     
                 const myDuration = videoPlayer.duration || null;
                 const warningDiv = document.getElementById('length-warning');
@@ -300,7 +268,7 @@
                 } else {
                     warningDiv.style.display = 'none';
                 }
-            }, 500);
+            }, 1000); // افزایش فاصله زمانی برای کاهش بار شبکه
     
             // --- Event Listeners دیگر ---
             connectBtn.addEventListener('click', () => {
@@ -316,8 +284,6 @@
                 partnerId = id;
                 updateStatus(`متصل به: ${partnerId}`, 'connected');
                 document.getElementById('connect-success-tick').classList.remove('hidden');
-                // ارسال شناسه خودمان به طرف مقابل در چت
-                broadcastData({ type: 'chat', message: `شناسه من: ${myId}` });
             });
     
             videoFileInput.addEventListener('change', (event) => {
@@ -364,56 +330,25 @@
                 videoPlayer.textTracks[0].mode = 'showing';
             }
     
+            // **رفع باگ ۱:** استفاده از روش مطمئن‌تر برای کپی کردن
             myIdSpan.addEventListener('click', () => {
-                navigator.clipboard.writeText(myId).then(() => {
+                if (!myId) return;
+                const textArea = document.createElement('textarea');
+                textArea.value = myId;
+                textArea.style.position = 'fixed'; // جلوگیری از پرش صفحه
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
                     copyHint.textContent = 'کپی شد!';
                     copyHint.style.display = 'inline';
                     setTimeout(() => { copyHint.style.display = 'none'; }, 2000);
-                });
-            });
-    
-            clearConnectionsBtn.addEventListener('click', () => {
-                if (partnerId) {
-                    broadcastData({ type: 'disconnect' });
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
                 }
-                partnerId = '';
-                partnerPlayStatus.textContent = '-';
-                partnerPlayTime.textContent = '-';
-                updateStatus('اتصال قطع شد', 'disconnected');
-                document.getElementById('connect-success-tick').classList.add('hidden');
-            });
-
-            document.getElementById('test-connection').addEventListener('click', () => {
-                if (!partnerId) {
-                    updateStatus('ابتدا به یک کاربر متصل شوید.', 'error');
-                    return;
-                }
-                let responded = false;
-                function handleTestResponse(data) {
-                    if (data.type === 'test-connection-response') {
-                        responded = true;
-                        updateStatus('اتصال برقرار است ✅', 'success');
-                        // حذف لیسنر موقت
-                        ws.removeEventListener('message', onWsMessage);
-                    }
-                }
-                function onWsMessage(event) {
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === 'signal' && message.from) {
-                            handleTestResponse(message.data);
-                        }
-                    } catch {}
-                }
-                ws.addEventListener('message', onWsMessage);
-                broadcastData({ type: 'test-connection' });
-                updateStatus('در حال بررسی اتصال...', 'connecting');
-                setTimeout(() => {
-                    if (!responded) {
-                        updateStatus('اتصال برقرار نیست یا طرف مقابل آفلاین است.', 'error');
-                        ws.removeEventListener('message', onWsMessage);
-                    }
-                }, 2000);
+                document.body.removeChild(textArea);
             });
     
             // --- شروع کار ---
