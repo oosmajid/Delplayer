@@ -21,13 +21,6 @@
             color: #fff;
             text-shadow: 1px 1px 2px black;
         }
-        #fullscreen-notification {
-            transition: opacity 0.5s ease-in-out;
-        }
-        /* استایل برای دکمه تمام‌صفحه سفارشی */
-        #video-wrapper:hover #custom-fullscreen-btn {
-            opacity: 1;
-        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
@@ -49,20 +42,7 @@
             </label>
             <input type="file" id="subtitle-file-input" accept=".vtt,.srt" class="hidden">
         </div>
-        
-        <!-- **تغییر ۱:** محفظه جدید برای ویدیو و عناصر مرتبط -->
-        <div id="video-wrapper" class="relative w-full">
-            <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
-            
-            <!-- **تغییر ۲:** اعلان به داخل محفظه منتقل شد -->
-            <div id="fullscreen-notification" class="absolute top-5 right-5 bg-cyan-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 z-50" style="visibility: hidden;"></div>
-
-            <!-- **تغییر ۳:** دکمه تمام‌صفحه سفارشی -->
-            <button id="custom-fullscreen-btn" class="absolute bottom-4 right-4 text-white p-2 bg-black bg-opacity-50 rounded-full opacity-0 transition-opacity duration-300 z-20" title="تمام صفحه">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 1v-4m0 0h-4m4 0l-5 5"></path></svg>
-            </button>
-        </div>
-
+        <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
         <div class="bg-gray-900 p-4 rounded-lg space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
             <div class="text-center md:text-right">
                 <span class="text-gray-400">شناسه شما:</span>
@@ -93,9 +73,7 @@
     <script>
         window.addEventListener('load', () => {
             // --- انتخاب عناصر DOM ---
-            const videoWrapper = document.getElementById('video-wrapper');
             const videoPlayer = document.getElementById('my-video');
-            const customFullscreenBtn = document.getElementById('custom-fullscreen-btn');
             const videoFileInput = document.getElementById('video-file-input');
             const subtitleFileInput = document.getElementById('subtitle-file-input');
             const myIdSpan = document.getElementById('my-id');
@@ -220,22 +198,6 @@
                     sendDataTo(partnerId, { type: 'ping' });
                 }, 5000);
             }
-
-            function showFullscreenNotification(message) {
-                const notification = document.getElementById('fullscreen-notification');
-                if (!notification) return;
-
-                notification.textContent = `پیام جدید: ${message}`;
-                notification.style.visibility = 'visible';
-                notification.style.opacity = '1';
-
-                setTimeout(() => {
-                    notification.style.opacity = '0';
-                    setTimeout(() => {
-                        notification.style.visibility = 'hidden';
-                    }, 500);
-                }, 5000);
-            }
     
             function handleReceivedData(data, fromId) {
                 if (data.type === 'ping') {
@@ -276,9 +238,6 @@
 
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
-                    if (document.fullscreenElement) {
-                        showFullscreenNotification(data.message);
-                    }
                     return;
                 }
                 if (data.type === 'disconnect') {
@@ -380,17 +339,6 @@
                     sendDataTo(partnerId, { type: 'disconnect' });
                 }
                 resetConnectionState();
-            });
-
-            // **تغییر ۴:** رویداد برای دکمه تمام‌صفحه سفارشی
-            customFullscreenBtn.addEventListener('click', () => {
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else {
-                    videoWrapper.requestFullscreen().catch(err => {
-                        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                    });
-                }
             });
     
             videoFileInput.addEventListener('change', (event) => {
