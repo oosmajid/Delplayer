@@ -74,6 +74,11 @@
     </div>
     <script>
         window.addEventListener('load', () => {
+            // --- توابع اصلی ---
+            function randomId() {
+                return Math.random().toString(36).substring(2, 9);
+            }
+
             // --- انتخاب عناصر DOM ---
             const videoPlayer = document.getElementById('my-video');
             const videoFileInput = document.getElementById('video-file-input');
@@ -94,24 +99,20 @@
             const WS_URL = `${wsProtocol}//${wsHost}`;
             
             let ws;
-            let myId = '';
+            // --- تغییر ۱: شناسه کاربر فقط یک بار در ابتدا ساخته می‌شود ---
+            const myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
             let audioCtx;
-
-            // --- تغییر ۱: متغیرهای جدید برای مدیریت تلاش مجدد هوشمند ---
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 30000; // حداکثر زمان انتظار: ۳۰ ثانیه
 
-            // --- توابع اصلی ---
-    
-            function randomId() {
-                return Math.random().toString(36).substring(2, 9);
-            }
-    
+            // --- تغییر ۲: شناسه یک بار در UI قرار می‌گیرد ---
+            myIdSpan.textContent = myId;
+
             function updateStatus(message, type) {
                 const statusClasses = {
                     success: 'bg-green-600 text-white',
@@ -128,11 +129,14 @@
                 ws = new WebSocket(WS_URL);
     
                 ws.onopen = () => {
-                    myId = randomId();
-                    myIdSpan.textContent = myId;
+                    // --- تغییر ۳: شناسه دیگر در اینجا ساخته نمی‌شود، فقط برای ثبت‌نام ارسال می‌شود ---
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
-                    updateStatus(`آماده - شناسه شما: ${myId}`, 'success');
-                    // --- تغییر ۲: ریست کردن شمارنده تلاش‌ها پس از اتصال موفق ---
+                    
+                    if (!partnerId) {
+                         updateStatus(`آماده - شناسه شما: ${myId}`, 'success');
+                    } else {
+                         updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
+                    }
                     reconnectAttempts = 0; 
                 };
     
@@ -148,13 +152,16 @@
                 };
     
                 ws.onclose = () => {
-                    // --- تغییر ۳: استفاده از استراتژی تلاش مجدد با تاخیر افزایشی (Exponential Backoff) ---
-                    // این کار از تلاش‌های مکرر و سریع در زمان قطعی طولانی جلوگیری می‌کند.
                     const delay = Math.min(MAX_RECONNECT_INTERVAL, Math.pow(2, reconnectAttempts) * 1000);
                     reconnectAttempts++;
                     
-                    updateStatus(`ارتباط قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
-                    resetConnectionState();
+                    updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
+                    
+                    // اگر به کسی متصل بودیم، وضعیت اتصال با او را ریست نمی‌کنیم
+                    // فقط منتظر می‌مانیم تا اتصال وب‌سوکت دوباره برقرار شود
+                    if (!partnerId) {
+                        resetConnectionState();
+                    }
                     
                     setTimeout(connectWebSocket, delay);
                 };
@@ -162,8 +169,6 @@
                 ws.onerror = (error) => {
                     console.error('WebSocket Error:', error);
                     updateStatus('خطا در ارتباط با سرور', 'error');
-                    // رویداد onclose معمولاً بلافاصله بعد از onerror فراخوانی می‌شود،
-                    // بنابراین نیازی به فراخوانی مجدد اتصال در اینجا نیست تا کار تکراری نشود.
                 };
             }
 
@@ -207,9 +212,13 @@
                         return;
                     }
 
-                    if (Date.now() - lastPongReceivedTime > 7000) {
-                        console.error("Heartbeat failed. Disconnecting.");
-                        resetConnectionState('ارتباط با طرف مقابل قطع شد');
+                    // --- تغییر ۴: منطق هوشمندتر برای مدیریت قطعی موقت ---
+                    // اگر برای مدتی پاسخی دریافت نشود، به جای قطع کامل، منتظر می‌مانیم
+                    if (Date.now() - lastPongReceivedTime > 8000) {
+                        console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
+                        updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
+                        clearInterval(heartbeatInterval);
+                        heartbeatInterval = null; 
                         return;
                     }
                     sendDataTo(partnerId, { type: 'ping' });
@@ -232,20 +241,25 @@
 
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
-
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-
                 gainNode.gain.value = 0.1; 
                 oscillator.frequency.value = 880; 
                 oscillator.type = 'sine';
-
                 const now = audioCtx.currentTime;
                 oscillator.start(now);
                 oscillator.stop(now + 0.2);
             }
     
             function handleReceivedData(data, fromId) {
+                // --- تغییر ۵: اگر از طرف مقابل پیامی دریافت شد، یعنی آنلاین است. ---
+                // اگر ضربان قلب متوقف شده بود، دوباره آن را فعال می‌کنیم.
+                if (fromId === partnerId && !heartbeatInterval) {
+                    console.log("Peer has reconnected. Restarting heartbeat.");
+                    updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                    startHeartbeat();
+                }
+
                 if (data.type === 'ping') {
                     sendDataTo(fromId, { type: 'pong' });
                     return;
