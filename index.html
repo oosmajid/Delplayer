@@ -93,6 +93,19 @@
             const chatSend = document.getElementById('chat-send');
             const copyHint = document.getElementById('copy-hint');
     
+            // --- تابع فعال/غیرفعال کردن چت ---
+            function setChatEnabled(enabled) {
+                chatInput.disabled = !enabled;
+                chatSend.disabled = !enabled;
+                if (!enabled) {
+                    chatInput.classList.add('opacity-50', 'cursor-not-allowed');
+                    chatSend.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    chatInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                    chatSend.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+    
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsHost = window.location.host;
@@ -199,6 +212,7 @@
                     clearInterval(heartbeatInterval);
                     heartbeatInterval = null;
                 }
+                setChatEnabled(false); // چت را غیرفعال کن
             }
 
             function startHeartbeat() {
@@ -280,6 +294,7 @@
                     disconnectBtn.classList.remove('hidden');
                     sendDataTo(fromId, { type: 'connect_confirm' });
                     startHeartbeat();
+                    setChatEnabled(true); // چت را فعال کن
                     return;
                 }
 
@@ -290,6 +305,7 @@
                     connectBtn.classList.add('hidden');
                     disconnectBtn.classList.remove('hidden');
                     startHeartbeat();
+                    setChatEnabled(true); // چت را فعال کن
                     return;
                 }
 
@@ -466,6 +482,7 @@
     
             // --- شروع اتصال اولیه ---
             connectWebSocket();
+            setChatEnabled(false); // در ابتدا چت غیرفعال باشد
         });
     </script>
 </body>
