@@ -99,13 +99,17 @@
             const WS_URL = `${wsProtocol}//${wsHost}`;
             
             let ws;
-            let myId = ''; // شناسه پویا است و بعدا مقداردهی می‌شود
+            const myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
             let audioCtx;
+            let reconnectAttempts = 0;
+            const MAX_RECONNECT_INTERVAL = 90000;
+
+            myIdSpan.textContent = myId;
 
             function updateChatUIState(enabled) {
                 chatInput.disabled = !enabled;
@@ -138,12 +142,14 @@
                 ws = new WebSocket(WS_URL);
     
                 ws.onopen = () => {
-                    // شناسه جدید در هر اتصال موفق ساخته می‌شود
-                    myId = randomId();
-                    myIdSpan.textContent = myId;
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
                     
-                    updateStatus(`آماده`, 'success');
+                    if (!partnerId) {
+                         updateStatus(`آماده`, 'success');
+                    } else {
+                         updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
+                    }
+                    reconnectAttempts = 0; 
                 };
     
                 ws.onmessage = (event) => {
@@ -158,15 +164,21 @@
                 };
     
                 ws.onclose = () => {
-                    // اتصال مجدد ساده پس از ۳ ثانیه
-                    updateStatus('ارتباط با سرور قطع شد. در حال اتصال مجدد...', 'error');
-                    resetConnectionState(false); // ریست کردن UI بدون نمایش پیام اضافه
-                    setTimeout(connectWebSocket, 3000);
+                    const delay = Math.min(MAX_RECONNECT_INTERVAL, Math.pow(2, reconnectAttempts) * 1000);
+                    reconnectAttempts++;
+                    
+                    updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
+                    
+                    if (!partnerId) {
+                        resetConnectionState();
+                    }
+                    
+                    setTimeout(connectWebSocket, delay);
                 };
     
                 ws.onerror = (error) => {
                     console.error('WebSocket Error:', error);
-                    // onclose بلافاصله بعد از این فراخوانی می‌شود
+                    updateStatus('خطا در ارتباط با سرور', 'error');
                 };
             }
 
@@ -179,21 +191,15 @@
                 sendDataTo(partnerId, data);
             }
             
-            function resetConnectionState(showMessage = true, reason = 'اتصال قطع شد') {
+            function resetConnectionState(reason = 'اتصال قطع شد') {
                 videoPlayer.pause();
                 if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(err => {});
+                    document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
                 }
 
                 partnerId = '';
                 partnerIdInput.value = '';
-                
-                if (showMessage) {
-                    updateStatus(reason, 'disconnected');
-                }
-                
-                myIdSpan.textContent = 'در حال دریافت...';
-
+                updateStatus(reason, 'disconnected');
                 document.getElementById('connect-success-tick').classList.add('hidden');
                 connectBtn.classList.remove('hidden');
                 disconnectBtn.classList.add('hidden');
@@ -220,6 +226,7 @@
                     if (Date.now() - lastPongReceivedTime > 8000) {
                         console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
+                        // **تغییر ۱:** غیرفعال کردن چت هنگام ناپایداری
                         updateChatUIState(false);
                         clearInterval(heartbeatInterval);
                         heartbeatInterval = null; 
@@ -259,6 +266,7 @@
                 if (fromId === partnerId && !heartbeatInterval) {
                     console.log("Peer has reconnected. Restarting heartbeat.");
                     updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                    // **تغییر ۲:** فعال کردن مجدد چت پس از بازگشت اتصال
                     updateChatUIState(true);
                     startHeartbeat();
                 }
@@ -307,7 +315,7 @@
                     return;
                 }
                 if (data.type === 'disconnect') {
-                    resetConnectionState(true, 'اتصال توسط طرف مقابل قطع شد');
+                    resetConnectionState('اتصال توسط طرف مقابل قطع شد');
                     return;
                 }
     
@@ -400,16 +408,11 @@
                 sendDataTo(idToConnect, { type: 'connect_request' });
             });
 
-            // **تغییر اصلی:** دکمه قطع اتصال اکنون اتصال را می‌بندد تا رویداد onclose اجرا شود
             disconnectBtn.addEventListener('click', () => {
                 if (partnerId) {
                     sendDataTo(partnerId, { type: 'disconnect' });
                 }
-                
-                // بستن اتصال فعلی برای دریافت شناسه جدید
-                if (ws) {
-                    ws.close();
-                }
+                resetConnectionState();
             });
     
             videoFileInput.addEventListener('change', (event) => {
