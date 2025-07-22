@@ -111,7 +111,6 @@
 
             myIdSpan.textContent = myId;
 
-            // **تغییر ۱:** تابع جدید برای مدیریت وضعیت UI چت
             function updateChatUIState(enabled) {
                 chatInput.disabled = !enabled;
                 chatSend.disabled = !enabled;
@@ -209,7 +208,6 @@
                     clearInterval(heartbeatInterval);
                     heartbeatInterval = null;
                 }
-                // **تغییر ۲:** غیرفعال کردن چت هنگام قطع اتصال
                 updateChatUIState(false);
             }
 
@@ -228,6 +226,8 @@
                     if (Date.now() - lastPongReceivedTime > 8000) {
                         console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
+                        // **تغییر ۱:** غیرفعال کردن چت هنگام ناپایداری
+                        updateChatUIState(false);
                         clearInterval(heartbeatInterval);
                         heartbeatInterval = null; 
                         return;
@@ -266,6 +266,8 @@
                 if (fromId === partnerId && !heartbeatInterval) {
                     console.log("Peer has reconnected. Restarting heartbeat.");
                     updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                    // **تغییر ۲:** فعال کردن مجدد چت پس از بازگشت اتصال
+                    updateChatUIState(true);
                     startHeartbeat();
                 }
 
@@ -288,7 +290,6 @@
                     disconnectBtn.classList.remove('hidden');
                     sendDataTo(fromId, { type: 'connect_confirm' });
                     startHeartbeat();
-                    // **تغییر ۳:** فعال کردن چت پس از اتصال
                     updateChatUIState(true);
                     return;
                 }
@@ -300,7 +301,6 @@
                     connectBtn.classList.add('hidden');
                     disconnectBtn.classList.remove('hidden');
                     startHeartbeat();
-                    // **تغییر ۴:** فعال کردن چت پس از تایید اتصال
                     updateChatUIState(true);
                     return;
                 }
@@ -477,7 +477,6 @@
             });
     
             // --- شروع اتصال اولیه ---
-            // **تغییر ۵:** غیرفعال کردن اولیه چت
             updateChatUIState(false);
             connectWebSocket();
         });
