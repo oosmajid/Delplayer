@@ -99,7 +99,6 @@
             const WS_URL = `${wsProtocol}//${wsHost}`;
             
             let ws;
-            // --- تغییر ۱: شناسه کاربر فقط یک بار در ابتدا ساخته می‌شود ---
             const myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
@@ -108,10 +107,24 @@
             let lastPongReceivedTime = 0;
             let audioCtx;
             let reconnectAttempts = 0;
-            const MAX_RECONNECT_INTERVAL = 30000; // حداکثر زمان انتظار: ۳۰ ثانیه
+            const MAX_RECONNECT_INTERVAL = 90000;
 
-            // --- تغییر ۲: شناسه یک بار در UI قرار می‌گیرد ---
             myIdSpan.textContent = myId;
+
+            // **تغییر ۱:** تابع جدید برای مدیریت وضعیت UI چت
+            function updateChatUIState(enabled) {
+                chatInput.disabled = !enabled;
+                chatSend.disabled = !enabled;
+                if (enabled) {
+                    chatInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                    chatSend.classList.remove('opacity-50', 'cursor-not-allowed');
+                    chatInput.placeholder = 'پیام خود را بنویسید...';
+                } else {
+                    chatInput.classList.add('opacity-50', 'cursor-not-allowed');
+                    chatSend.classList.add('opacity-50', 'cursor-not-allowed');
+                    chatInput.placeholder = 'برای چت ابتدا متصل شوید';
+                }
+            }
 
             function updateStatus(message, type) {
                 const statusClasses = {
@@ -130,7 +143,6 @@
                 ws = new WebSocket(WS_URL);
     
                 ws.onopen = () => {
-                    // --- تغییر ۳: شناسه دیگر در اینجا ساخته نمی‌شود، فقط برای ثبت‌نام ارسال می‌شود ---
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
                     
                     if (!partnerId) {
@@ -158,8 +170,6 @@
                     
                     updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
                     
-                    // اگر به کسی متصل بودیم، وضعیت اتصال با او را ریست نمی‌کنیم
-                    // فقط منتظر می‌مانیم تا اتصال وب‌سوکت دوباره برقرار شود
                     if (!partnerId) {
                         resetConnectionState();
                     }
@@ -199,6 +209,8 @@
                     clearInterval(heartbeatInterval);
                     heartbeatInterval = null;
                 }
+                // **تغییر ۲:** غیرفعال کردن چت هنگام قطع اتصال
+                updateChatUIState(false);
             }
 
             function startHeartbeat() {
@@ -213,8 +225,6 @@
                         return;
                     }
 
-                    // --- تغییر ۴: منطق هوشمندتر برای مدیریت قطعی موقت ---
-                    // اگر برای مدتی پاسخی دریافت نشود، به جای قطع کامل، منتظر می‌مانیم
                     if (Date.now() - lastPongReceivedTime > 8000) {
                         console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
@@ -253,8 +263,6 @@
             }
     
             function handleReceivedData(data, fromId) {
-                // --- تغییر ۵: اگر از طرف مقابل پیامی دریافت شد، یعنی آنلاین است. ---
-                // اگر ضربان قلب متوقف شده بود، دوباره آن را فعال می‌کنیم.
                 if (fromId === partnerId && !heartbeatInterval) {
                     console.log("Peer has reconnected. Restarting heartbeat.");
                     updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
@@ -280,6 +288,8 @@
                     disconnectBtn.classList.remove('hidden');
                     sendDataTo(fromId, { type: 'connect_confirm' });
                     startHeartbeat();
+                    // **تغییر ۳:** فعال کردن چت پس از اتصال
+                    updateChatUIState(true);
                     return;
                 }
 
@@ -290,6 +300,8 @@
                     connectBtn.classList.add('hidden');
                     disconnectBtn.classList.remove('hidden');
                     startHeartbeat();
+                    // **تغییر ۴:** فعال کردن چت پس از تایید اتصال
+                    updateChatUIState(true);
                     return;
                 }
 
@@ -465,6 +477,8 @@
             });
     
             // --- شروع اتصال اولیه ---
+            // **تغییر ۵:** غیرفعال کردن اولیه چت
+            updateChatUIState(false);
             connectWebSocket();
         });
     </script>
