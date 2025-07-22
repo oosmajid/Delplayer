@@ -99,7 +99,7 @@
             const WS_URL = `${wsProtocol}//${wsHost}`;
             
             let ws;
-            let myId = randomId(); 
+            const myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
             let partnerVideoDuration = null;
@@ -170,8 +170,7 @@
                     updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
                     
                     if (!partnerId) {
-                        // اگر قطع اتصال به خاطر ریست شدن بود، دیگر تلاش مجدد نکن
-                        return;
+                        resetConnectionState();
                     }
                     
                     setTimeout(connectWebSocket, delay);
@@ -210,17 +209,6 @@
                     heartbeatInterval = null;
                 }
                 updateChatUIState(false);
-
-                // --- تغییر جدید: تولید شناسه جدید ---
-                myId = randomId();
-                myIdSpan.textContent = myId;
-
-                // اگر ws باز است، ببند و دوباره وصل شو
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.close();
-                } else {
-                    connectWebSocket();
-                }
             }
 
             function startHeartbeat() {
