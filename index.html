@@ -137,6 +137,12 @@
                 const className = statusClasses[type] || 'bg-gray-700 text-yellow-400';
                 const animationClass = type === 'connecting' ? 'animate-pulse' : '';
                 statusDiv.innerHTML = `<span class="${className} ${animationClass} px-4 py-1 rounded-full">${message}</span>`;
+                // --- فعال/غیرفعال کردن چت بر اساس وضعیت ---
+                if (type === 'connecting') {
+                    setChatEnabled(false);
+                } else if (type === 'connected') {
+                    setChatEnabled(true);
+                }
             }
     
             function connectWebSocket() {
