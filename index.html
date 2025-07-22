@@ -122,7 +122,8 @@
                     connecting: 'bg-yellow-500 text-black'
                 }; 
                 const className = statusClasses[type] || 'bg-gray-700 text-yellow-400';
-                statusDiv.innerHTML = `<span class="${className} px-4 py-1 rounded-full">${message}</span>`;
+                const animationClass = type === 'connecting' ? 'animate-pulse' : '';
+                statusDiv.innerHTML = `<span class="${className} ${animationClass} px-4 py-1 rounded-full">${message}</span>`;
             }
     
             function connectWebSocket() {
