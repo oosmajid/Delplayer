@@ -44,6 +44,9 @@
         </div>
         
         <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
+            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
+        </div>
 
         <div class="bg-gray-900 p-4 rounded-lg space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
             <div class="text-center md:text-right">
@@ -68,9 +71,6 @@
             </div>
         </div>
         <div id="length-warning" class="text-center font-bold text-red-500 mb-2" style="display:none"></div>
-        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
-            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
-        </div>
     </div>
     <script>
         window.addEventListener('load', () => {
@@ -133,7 +133,7 @@
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
                     
                     if (!partnerId) {
-                         updateStatus(`آماده - شناسه شما: ${myId}`, 'success');
+                         updateStatus(`آماده`, 'success');
                     } else {
                          updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
                     }
