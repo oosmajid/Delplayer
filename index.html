@@ -413,10 +413,9 @@
                     sendDataTo(partnerId, { type: 'disconnect' });
                 }
                 resetConnectionState();
-                // تولید شناسه جدید
+                // تولید شناسه جدید و ثبت‌نام مجدد
                 myId = randomId();
                 myIdSpan.textContent = myId;
-                // ثبت شناسه جدید در سرور
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
                 }
