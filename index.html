@@ -100,7 +100,7 @@
             const WS_URL = `${wsProtocol}//${wsHost}`;
             
             let ws;
-            const myId = randomId(); 
+            let myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
             let partnerVideoDuration = null;
@@ -210,6 +210,14 @@
                     heartbeatInterval = null;
                 }
                 updateChatUIState(false);
+
+                // --- تولید شناسه جدید بعد از قطع اتصال ---
+                myId = randomId();
+                myIdSpan.textContent = myId;
+                // اگر ws باز است، شناسه جدید را ثبت کن
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'register', id: myId }));
+                }
             }
 
             function startHeartbeat() {
