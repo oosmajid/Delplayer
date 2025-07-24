@@ -211,6 +211,10 @@
                 }
                 updateChatUIState(false);
 
+                // --- باطل کردن شناسه قبلی در سرور ---
+                if (ws && ws.readyState === WebSocket.OPEN && myId) {
+                    ws.send(JSON.stringify({ type: 'unregister', id: myId }));
+                }
                 // --- تولید شناسه جدید بعد از قطع اتصال ---
                 myId = randomId();
                 myIdSpan.textContent = myId;

@@ -52,6 +52,15 @@ wss.on('connection', function connection(ws) {
             userId = data.id;
             clients[userId] = ws;
             console.log(`Client registered with ID: ${userId}`);
+        } else if (data.type === 'unregister' && data.id) {
+            if (clients[data.id]) {
+                delete clients[data.id];
+                console.log(`Client unregistered with ID: ${data.id}`);
+            }
+            // اگر کاربر خودش را unregister کرد، userId را هم null کن
+            if (userId === data.id) {
+                userId = null;
+            }
         } else if (data.type === 'signal' && data.to && clients[data.to]) {
             // سیگنال را به کلاینت صحیح ارسال می‌کند
             clients[data.to].send(JSON.stringify({ ...data, from: userId }));
