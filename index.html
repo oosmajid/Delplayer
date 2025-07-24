@@ -92,6 +92,7 @@
             const chatInput = document.getElementById('chat-input');
             const chatSend = document.getElementById('chat-send');
             const copyHint = document.getElementById('copy-hint');
+            const warningDiv = document.getElementById('length-warning');
     
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -226,7 +227,6 @@
                     if (Date.now() - lastPongReceivedTime > 8000) {
                         console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
-                        // **تغییر ۱:** غیرفعال کردن چت هنگام ناپایداری
                         updateChatUIState(false);
                         clearInterval(heartbeatInterval);
                         heartbeatInterval = null; 
@@ -266,7 +266,6 @@
                 if (fromId === partnerId && !heartbeatInterval) {
                     console.log("Peer has reconnected. Restarting heartbeat.");
                     updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
-                    // **تغییر ۲:** فعال کردن مجدد چت پس از بازگشت اتصال
                     updateChatUIState(true);
                     startHeartbeat();
                 }
@@ -333,6 +332,8 @@
                     if (data.rate && videoPlayer.playbackRate !== data.rate) {
                         videoPlayer.playbackRate = data.rate;
                     }
+                    // --- تغییر ۱: بررسی طول ویدیو بلافاصله پس از دریافت اطلاعات ---
+                    checkVideoLength();
                     setTimeout(() => {
                         isSyncing = false;
                     }, 200);
@@ -383,16 +384,25 @@
             videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
-            setInterval(() => {
+            // --- تغییر ۲: ایجاد یک تابع جداگانه برای بررسی طول ویدیو ---
+            function checkVideoLength() {
                 const myDuration = videoPlayer.duration || null;
-                const warningDiv = document.getElementById('length-warning');
-                if (partnerId && videoPlayer.src && partnerVideoDuration !== null && myDuration !== null && Math.abs(myDuration - partnerVideoDuration) > 0.5) {
+                // اگر به کسی متصل نیستیم یا اطلاعات کافی نداریم، هشدار را مخفی کن
+                if (!partnerId || !videoPlayer.src || partnerVideoDuration === null || myDuration === null || isNaN(myDuration) || isNaN(partnerVideoDuration)) {
+                    warningDiv.style.display = 'none';
+                    return;
+                }
+
+                if (Math.abs(myDuration - partnerVideoDuration) > 1.5) { // آستانه ۱.۵ ثانیه برای جلوگیری از خطاهای جزئی
                     warningDiv.textContent = '⚠️ طول ویدیوی شما و طرف مقابل یکسان نیست. لطفاً هر دو یک فایل یکسان انتخاب کنید.';
                     warningDiv.style.display = 'block';
                 } else {
                     warningDiv.style.display = 'none';
                 }
-            }, 3000);
+            }
+
+            // --- تغییر ۳: بررسی دوره‌ای به عنوان پشتیبان باقی می‌ماند ---
+            setInterval(checkVideoLength, 3000);
     
             connectBtn.addEventListener('click', () => {
                 const idToConnect = partnerIdInput.value.trim();
@@ -421,6 +431,15 @@
                     const fileURL = URL.createObjectURL(file);
                     videoPlayer.src = fileURL;
                     updateStatus(`فایل بارگذاری شد: ${file.name}`, 'success');
+
+                    // --- تغییر ۴: ارسال اطلاعات ویدیو به محض بارگذاری ---
+                    // منتظر می‌مانیم تا متادیتای ویدیو (شامل طول آن) بارگذاری شود
+                    videoPlayer.addEventListener('loadedmetadata', () => {
+                        // اطلاعات طول ویدیو را بلافاصله برای طرف مقابل ارسال می‌کنیم
+                        sendSyncData();
+                        // بررسی را به صورت محلی هم انجام می‌دهیم
+                        checkVideoLength();
+                    }, { once: true }); // این رویداد فقط یک بار پس از هر انتخاب فایل اجرا می‌شود
                 }
             });
     
