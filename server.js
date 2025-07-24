@@ -7,72 +7,39 @@ const WebSocket = require('ws');
 const port = process.env.PORT || 8080;
 
 // --- ۱. ساخت وب‌سرور HTTP ---
+// این سرور به درخواست‌های صفحات وب پاسخ می‌دهد.
 const server = http.createServer((req, res) => {
+    // ما فقط می‌خواهیم فایل index.html را سرویس دهیم.
+    // هر درخواستی به سرور این فایل را دریافت خواهد کرد.
     const filePath = path.join(__dirname, 'index.html');
 
     fs.readFile(filePath, (err, content) => {
         if (err) {
+            // اگر خطایی رخ دهد (مثلاً فایل پیدا نشود)، خطای 500 ارسال می‌شود.
             console.error('Error reading index.html:', err);
             res.writeHead(500);
             res.end('Server Error: Could not load index.html');
             return;
         }
+
+        // اگر فایل با موفقیت خوانده شد، آن را به مرورگر ارسال می‌کنیم.
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(content);
     });
 });
 
 // --- ۲. ساخت سرور WebSocket ---
+// ما سرور WebSocket را به سرور HTTP موجود خود متصل می‌کنیم.
+// این کار به آن‌ها اجازه می‌دهد از یک آدرس IP و پورت مشترک استفاده کنند.
 const wss = new WebSocket.Server({ server });
-
-// --- منطق Rate Limiter ---
-const ipRequestCounts = new Map();
-const RATE_LIMIT_WINDOW_MS = 5000; // بازه زمانی: ۱ ثانیه
-const RATE_LIMIT_MAX_REQUESTS = 1; // حداکثر درخواست در بازه زمانی
-
-// --- شروع تغییر: پاکسازی دوره‌ای برای جلوگیری از نشت حافظه ---
-const CLEANUP_INTERVAL_MS = 60 * 1000; // هر ۱ دقیقه
-
-setInterval(() => {
-    const now = Date.now();
-    console.log(`Running cleanup for rate limiter map. Current size: ${ipRequestCounts.size}`);
-    for (const [ip, data] of ipRequestCounts.entries()) {
-        // اگر آخرین درخواست از یک IP بیش از ۱ دقیقه پیش بوده، آن را حذف می‌کنیم
-        if (now - data.startTime > CLEANUP_INTERVAL_MS) {
-            ipRequestCounts.delete(ip);
-        }
-    }
-    console.log(`Cleanup finished. Map size is now: ${ipRequestCounts.size}`);
-}, CLEANUP_INTERVAL_MS);
-// --- پایان تغییر ---
 
 let clients = {};
 
-// برای دسترسی به IP، باید پارامتر 'req' را به این تابع اضافه کنیم
-wss.on('connection', function connection(ws, req) {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    
+// منطق WebSocket دقیقاً مانند قبل باقی می‌ماند.
+wss.on('connection', function connection(ws) {
     let userId = null;
 
     ws.on('message', function incoming(message) {
-        const now = Date.now();
-        const clientData = ipRequestCounts.get(ip) || { count: 0, startTime: now };
-
-        if (now - clientData.startTime > RATE_LIMIT_WINDOW_MS) {
-            clientData.count = 1;
-            clientData.startTime = now;
-        } else {
-            clientData.count++;
-        }
-
-        ipRequestCounts.set(ip, clientData);
-
-        if (clientData.count > RATE_LIMIT_MAX_REQUESTS) {
-            console.warn(`Rate limit exceeded for IP: ${ip}. Closing connection.`);
-            ws.close();
-            return;
-        }
-
         let data = {};
         try {
             data = JSON.parse(message);
@@ -86,12 +53,14 @@ wss.on('connection', function connection(ws, req) {
             clients[userId] = ws;
             console.log(`Client registered with ID: ${userId}`);
         } else if (data.type === 'signal' && data.to && clients[data.to]) {
+            // سیگنال را به کلاینت صحیح ارسال می‌کند
             clients[data.to].send(JSON.stringify({ ...data, from: userId }));
         }
     });
 
     ws.on('close', function() {
         if (userId && clients[userId]) {
+            // کلاینت را هنگام قطع اتصال حذف می‌کند
             delete clients[userId];
             console.log(`Client with ID: ${userId} disconnected.`);
         }
@@ -104,6 +73,8 @@ wss.on('connection', function connection(ws, req) {
 
 
 // --- ۳. شروع به کار سرور ---
+// این دستور سرور HTTP را راه‌اندازی می‌کند و از آنجایی که سرور WebSocket به آن متصل است،
+// آن هم شروع به گوش دادن به اتصالات می‌کند.
 server.listen(port, () => {
     console.log(`HTTP server is running on http://localhost:${port}`);
     console.log('DelPlayer is ready. Users can now connect via a URL.');
