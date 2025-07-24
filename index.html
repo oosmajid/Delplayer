@@ -290,6 +290,11 @@
                     sendDataTo(fromId, { type: 'connect_confirm' });
                     startHeartbeat();
                     updateChatUIState(true);
+                    
+                    // --- تغییر ۱: ارسال اطلاعات ویدیو به محض تایید اتصال ---
+                    if (videoPlayer.src && videoPlayer.duration) {
+                        sendSyncData();
+                    }
                     return;
                 }
 
@@ -301,6 +306,11 @@
                     disconnectBtn.classList.remove('hidden');
                     startHeartbeat();
                     updateChatUIState(true);
+
+                    // --- تغییر ۲: ارسال اطلاعات ویدیو به محض برقراری اتصال ---
+                    if (videoPlayer.src && videoPlayer.duration) {
+                        sendSyncData();
+                    }
                     return;
                 }
 
@@ -332,7 +342,6 @@
                     if (data.rate && videoPlayer.playbackRate !== data.rate) {
                         videoPlayer.playbackRate = data.rate;
                     }
-                    // --- تغییر ۱: بررسی طول ویدیو بلافاصله پس از دریافت اطلاعات ---
                     checkVideoLength();
                     setTimeout(() => {
                         isSyncing = false;
@@ -384,16 +393,14 @@
             videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
-            // --- تغییر ۲: ایجاد یک تابع جداگانه برای بررسی طول ویدیو ---
             function checkVideoLength() {
                 const myDuration = videoPlayer.duration || null;
-                // اگر به کسی متصل نیستیم یا اطلاعات کافی نداریم، هشدار را مخفی کن
                 if (!partnerId || !videoPlayer.src || partnerVideoDuration === null || myDuration === null || isNaN(myDuration) || isNaN(partnerVideoDuration)) {
                     warningDiv.style.display = 'none';
                     return;
                 }
 
-                if (Math.abs(myDuration - partnerVideoDuration) > 1.5) { // آستانه ۱.۵ ثانیه برای جلوگیری از خطاهای جزئی
+                if (Math.abs(myDuration - partnerVideoDuration) > 1.5) {
                     warningDiv.textContent = '⚠️ طول ویدیوی شما و طرف مقابل یکسان نیست. لطفاً هر دو یک فایل یکسان انتخاب کنید.';
                     warningDiv.style.display = 'block';
                 } else {
@@ -401,7 +408,6 @@
                 }
             }
 
-            // --- تغییر ۳: بررسی دوره‌ای به عنوان پشتیبان باقی می‌ماند ---
             setInterval(checkVideoLength, 3000);
     
             connectBtn.addEventListener('click', () => {
@@ -432,14 +438,10 @@
                     videoPlayer.src = fileURL;
                     updateStatus(`فایل بارگذاری شد: ${file.name}`, 'success');
 
-                    // --- تغییر ۴: ارسال اطلاعات ویدیو به محض بارگذاری ---
-                    // منتظر می‌مانیم تا متادیتای ویدیو (شامل طول آن) بارگذاری شود
                     videoPlayer.addEventListener('loadedmetadata', () => {
-                        // اطلاعات طول ویدیو را بلافاصله برای طرف مقابل ارسال می‌کنیم
                         sendSyncData();
-                        // بررسی را به صورت محلی هم انجام می‌دهیم
                         checkVideoLength();
-                    }, { once: true }); // این رویداد فقط یک بار پس از هر انتخاب فایل اجرا می‌شود
+                    }, { once: true });
                 }
             });
     
