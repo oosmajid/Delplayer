@@ -4,8 +4,8 @@ const path = require('path');
 const WebSocket = require('ws');
 
 // پورت سرور ما. هم HTTP و هم WebSocket از این پورت استفاده خواهند کرد.
-const port = process.env.PORT || 8080;
-
+// const port = process.env.PORT || 8080;
+const port = 80
 // --- ۱. ساخت وب‌سرور HTTP ---
 // این سرور به درخواست‌های صفحات وب پاسخ می‌دهد.
 const server = http.createServer((req, res) => {
