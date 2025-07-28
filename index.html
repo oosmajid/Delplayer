@@ -81,6 +81,16 @@
             </div>
         </div>
     </div>
+    <footer class="text-center py-4">
+        <p class="text-gray-400">
+            اگه دل‌پلیر رو دوست داشتی، 
+            <a href="https://hamibash.com/Delplayer" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline">
+                یه قهوه من رو مهمون کن
+            </a>
+            ☕
+        </p>
+    </footer>
+
     <script>
         window.addEventListener('load', () => {
             // --- توابع اصلی ---
@@ -220,14 +230,11 @@
                 }
                 updateChatUIState(false);
 
-                // --- باطل کردن شناسه قبلی در سرور ---
                 if (ws && ws.readyState === WebSocket.OPEN && myId) {
                     ws.send(JSON.stringify({ type: 'unregister', id: myId }));
                 }
-                // --- تولید شناسه جدید بعد از قطع اتصال ---
                 myId = randomId();
                 myIdSpan.textContent = myId;
-                // اگر ws باز است، شناسه جدید را ثبت کن
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
                 }
@@ -312,7 +319,6 @@
                     startHeartbeat();
                     updateChatUIState(true);
                     
-                    // --- تغییر ۱: ارسال اطلاعات ویدیو به محض تایید اتصال ---
                     if (videoPlayer.src && videoPlayer.duration) {
                         sendSyncData();
                     }
@@ -328,7 +334,6 @@
                     startHeartbeat();
                     updateChatUIState(true);
 
-                    // --- تغییر ۲: ارسال اطلاعات ویدیو به محض برقراری اتصال ---
                     if (videoPlayer.src && videoPlayer.duration) {
                         sendSyncData();
                     }
