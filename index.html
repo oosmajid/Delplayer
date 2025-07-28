@@ -90,7 +90,6 @@
             ☕
         </p>
     </footer>
-
     <script>
         window.addEventListener('load', () => {
             // --- توابع اصلی ---
@@ -256,6 +255,12 @@
                         console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
                         updateChatUIState(false);
+                        
+                        videoPlayer.pause();
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                        }
+                        
                         clearInterval(heartbeatInterval);
                         heartbeatInterval = null; 
                         return;
