@@ -121,6 +121,9 @@
             let myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
+            // CHANGE START: Add a flag to track if the user is currently seeking
+            let isDraggingSeekBar = false; 
+            // CHANGE END
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
@@ -360,6 +363,14 @@
                 }
     
                 if (data.type === 'sync') {
+                    // CHANGE START: Ignore sync messages from the partner if the local user is currently seeking.
+                    // این کار از پرش ناخواسته ویدیو جلوگیری می‌کند وقتی شما در حال درگ کردن هستید
+                    if (isDraggingSeekBar) {
+                        console.log("Ignoring sync from partner while local user is seeking.");
+                        return;
+                    }
+                    // CHANGE END
+
                     isSyncing = true;
                     partnerVideoDuration = data.duration || null;
                     if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
@@ -421,8 +432,22 @@
     
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
-            videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
+            
+            // CHANGE START: Replace the single 'seeked' listener with 'seeking' and 'seeked'
+            // to control when sync data is sent.
+
+            // وقتی کاربر شروع به جابجایی می‌کند، این فلگ را فعال می‌کنیم
+            videoPlayer.addEventListener('seeking', () => {
+                isDraggingSeekBar = true;
+            });
+
+            // وقتی جابجایی تمام شد، فلگ را غیرفعال کرده و یک بار پیام همگام‌سازی را ارسال می‌کنیم
+            videoPlayer.addEventListener('seeked', () => {
+                isDraggingSeekBar = false;
+                sendSyncData(); // فقط در پایان عمل seek، داده را ارسال کن
+            });
+            // CHANGE END
     
             function checkVideoLength() {
                 const myDuration = videoPlayer.duration || null;
