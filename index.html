@@ -121,7 +121,6 @@
             let myId = randomId(); 
             let partnerId = '';
             let isSyncing = false; 
-            let isDraggingSeekBar = false; 
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
@@ -361,11 +360,6 @@
                 }
     
                 if (data.type === 'sync') {
-                    if (isDraggingSeekBar) {
-                        console.log("Ignoring sync from partner while local user is seeking.");
-                        return;
-                    }
-
                     isSyncing = true;
                     partnerVideoDuration = data.duration || null;
                     if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
@@ -415,13 +409,6 @@
             });
     
             function sendSyncData() {
-                // CHANGE START: Add a more robust guard to prevent sending any sync data while the user is actively seeking.
-                // این شرط از ارسال هرگونه پیام (مثلا از طریق رویداد pause) در حین جابجایی جلوگیری می‌کند
-                if (isDraggingSeekBar) {
-                    return;
-                }
-                // CHANGE END
-
                 if (isSyncing || !partnerId || !videoPlayer.src) return;
                 broadcastData({
                     type: 'sync',
@@ -434,16 +421,8 @@
     
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
+            videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
-            
-            videoPlayer.addEventListener('seeking', () => {
-                isDraggingSeekBar = true;
-            });
-
-            videoPlayer.addEventListener('seeked', () => {
-                isDraggingSeekBar = false;
-                sendSyncData(); // فقط در پایان عمل seek، داده را ارسال کن
-            });
     
             function checkVideoLength() {
                 const myDuration = videoPlayer.duration || null;
