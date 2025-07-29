@@ -127,6 +127,7 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
+            let seekTimeout = null;
 
             myIdSpan.textContent = myId;
 
@@ -421,7 +422,16 @@
     
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
-            videoPlayer.addEventListener('seeked', sendSyncData);
+            
+            videoPlayer.addEventListener('seeked', () => {
+                // تایم‌اوت قبلی را پاک می‌کنیم تا فقط آخرین درخواست ارسال شود
+                clearTimeout(seekTimeout);
+                // یک تایم‌اوت جدید تنظیم می‌کنیم
+                seekTimeout = setTimeout(() => {
+                    sendSyncData();
+                }, 250); // ارسال آپدیت ۲۵۰ میلی‌ثانیه پس از آخرین جابجایی
+            });
+
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
             function checkVideoLength() {
