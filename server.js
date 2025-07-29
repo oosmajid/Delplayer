@@ -7,11 +7,10 @@ const port = process.env.PORT || 8080;
 
 // --- ۱. تنظیمات امنیتی ---
 const MAX_CONNECTIONS_PER_IP = 5;
-const MAX_MESSAGES_PER_SECOND = 10;
+const MAX_MESSAGES_PER_SECOND = 10; // این محدودیت فقط برای پیام‌های غیرهمگام‌سازی اعمال می‌شود
 const MAX_MESSAGE_LENGTH = 1024; // 1KB
 
 const ipConnections = new Map();
-// **تغییر ۱:** استفاده از WeakMap برای جلوگیری قطعی از نشت حافظه
 const messageTimestamps = new WeakMap(); 
 
 // --- ۲. ساخت وب‌سرور HTTP ---
@@ -50,19 +49,6 @@ wss.on('connection', function connection(ws, req) {
     messageTimestamps.set(ws, []);
 
     ws.on('message', function incoming(message) {
-        const now = Date.now();
-        const timestamps = messageTimestamps.get(ws) || [];
-        while (timestamps.length > 0 && timestamps[0] < now - 1000) {
-            timestamps.shift();
-        }
-        if (timestamps.length >= MAX_MESSAGES_PER_SECOND) {
-            console.warn(`Connection closed for user ${userId}: Message rate limit exceeded.`);
-            ws.close();
-            return;
-        }
-        timestamps.push(now);
-        messageTimestamps.set(ws, timestamps);
-
         let data = {};
         try {
             const messageString = message.toString();
@@ -76,10 +62,32 @@ wss.on('connection', function connection(ws, req) {
             return;
         }
 
+        // CHANGE START: Check message type BEFORE applying rate limit.
+        // پیام‌های همگام‌سازی ویدیو از محدودیت نرخ ارسال معاف می‌شوند.
+        const isSyncMessage = data.type === 'signal' && data.data && data.data.type === 'sync';
+
+        if (!isSyncMessage) {
+            const now = Date.now();
+            const timestamps = messageTimestamps.get(ws) || [];
+            while (timestamps.length > 0 && timestamps[0] < now - 1000) {
+                timestamps.shift();
+            }
+            if (timestamps.length >= MAX_MESSAGES_PER_SECOND) {
+                console.warn(`Connection closed for user ${userId}: Message rate limit exceeded for non-sync message.`);
+                ws.close();
+                return;
+            }
+            timestamps.push(now);
+            messageTimestamps.set(ws, timestamps);
+        }
+        // CHANGE END
+
+        // Sanitize chat messages
         if (data.type === 'signal' && data.data && data.data.type === 'chat' && data.data.message) {
             data.data.message = data.data.message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
+        // Handle different message types
         if (data.type === 'register' && data.id) {
             userId = data.id;
             clients[userId] = ws;
@@ -93,12 +101,12 @@ wss.on('connection', function connection(ws, req) {
                 userId = null;
             }
         } else if (data.type === 'signal' && data.to && clients[data.to]) {
+            // Forward the signal to the target client
             clients[data.to].send(JSON.stringify({ ...data, from: userId }));
         }
     });
 
     ws.on('close', function() {
-        // **تغییر ۲:** پاک کردن کامل ورودی IP در صورت صفر شدن شمارنده
         const currentCount = ipConnections.get(ip) || 0;
         if (currentCount <= 1) {
             ipConnections.delete(ip);
@@ -112,7 +120,6 @@ wss.on('connection', function connection(ws, req) {
             delete clients[userId];
             console.log(`Client with ID: ${userId} disconnected.`);
         }
-        // با استفاده از WeakMap، دیگر نیازی به پاک کردن دستی messageTimestamps نیست
     });
 
     ws.on('error', function(error) {
