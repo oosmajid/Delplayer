@@ -127,8 +127,6 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
-            // **تغییر ۱:** متغیر جدید برای مدیریت حالت Seeking
-            let isSeeking = false;
 
             myIdSpan.textContent = myId;
 
@@ -362,9 +360,6 @@
                 }
     
                 if (data.type === 'sync') {
-                    // **تغییر ۲:** اگر کاربر در حال جابجایی نوار زمان است، آپدیت‌های دریافتی را نادیده بگیر
-                    if (isSeeking) return;
-
                     isSyncing = true;
                     partnerVideoDuration = data.duration || null;
                     if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
@@ -414,8 +409,7 @@
             });
     
             function sendSyncData() {
-                // **تغییر ۳:** اگر کاربر در حال جابجایی نوار زمان است، پیام ارسال نکن
-                if (isSyncing || isSeeking || !partnerId || !videoPlayer.src) return;
+                if (isSyncing || !partnerId || !videoPlayer.src) return;
                 broadcastData({
                     type: 'sync',
                     playing: !videoPlayer.paused,
@@ -427,16 +421,7 @@
     
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
-            
-            // **تغییر ۴:** اضافه کردن رویدادهای جدید برای مدیریت بهتر Seek
-            videoPlayer.addEventListener('seeking', () => {
-                isSeeking = true;
-            });
-            videoPlayer.addEventListener('seeked', () => {
-                isSeeking = false;
-                sendSyncData();
-            });
-
+            videoPlayer.addEventListener('seeked', sendSyncData);
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
             function checkVideoLength() {
