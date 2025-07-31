@@ -443,7 +443,12 @@
                     startHeartbeat();
                     updateChatUIState(true);
                     
-                    if (videoPlayer.src) {
+                    if (isYoutubeVideo && youtubePlayer) {
+                        broadcastData({
+                            type: 'load_youtube',
+                            videoId: youtubePlayer.getVideoData().video_id
+                        });
+                    } else if (videoPlayer.src) {
                         if (videoPlayer.src.startsWith('blob:')) {
                             sendSyncData();
                         } else {
@@ -470,11 +475,22 @@
                     return;
                 }
                 
-                if (data.type === 'request_source' && videoPlayer.src) {
-                    if (videoPlayer.src.startsWith('blob:')) {
-                        sendSyncData();
-                    } else {
-                        broadcastData({ type: 'load_url', url: videoPlayer.src });
+                if (data.type === 'request_source') {
+                    if (isYoutubeVideo && youtubePlayer) {
+                        broadcastData({
+                            type: 'load_youtube',
+                            videoId: youtubePlayer.getVideoData().video_id
+                        });
+                        // همچنین وضعیت فعلی پخش رو هم ارسال می‌کنیم
+                        setTimeout(() => {
+                            sendYoutubeSyncData();
+                        }, 1000);
+                    } else if (videoPlayer.src) {
+                        if (videoPlayer.src.startsWith('blob:')) {
+                            sendSyncData();
+                        } else {
+                            broadcastData({ type: 'load_url', url: videoPlayer.src });
+                        }
                     }
                     return;
                 }
