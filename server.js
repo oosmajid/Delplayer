@@ -7,26 +7,47 @@ const port = process.env.PORT || 8080;
 
 // --- ۱. تنظیمات امنیتی ---
 const MAX_CONNECTIONS_PER_IP = 5;
-const MAX_MESSAGES_PER_SECOND = 10; // این محدودیت فقط برای پیام‌های غیرهمگام‌سازی اعمال می‌شود
+const MAX_MESSAGES_PER_SECOND = 10;
 const MAX_MESSAGE_LENGTH = 1024; // 1KB
 
 const ipConnections = new Map();
-const messageTimestamps = new WeakMap(); 
+const messageTimestamps = new WeakMap();
 
 // --- ۲. ساخت وب‌سرور HTTP ---
 const server = http.createServer((req, res) => {
-    const filePath = path.join(__dirname, 'index.html');
+    // --- SEO & Routing Changes (START) ---
+    let filePath;
+    let contentType = 'text/html; charset=utf-8';
+
+    if (req.url === '/') {
+        filePath = path.join(__dirname, 'index.html');
+    } else if (req.url === '/robots.txt') {
+        filePath = path.join(__dirname, 'robots.txt');
+        contentType = 'text/plain';
+    } else if (req.url === '/sitemap.xml') {
+        filePath = path.join(__dirname, 'sitemap.xml');
+        contentType = 'application/xml';
+    } else {
+        // For any other URL, send a 404 Not Found error
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>404 - صفحه مورد نظر یافت نشد</h1>');
+        return;
+    }
+    // --- SEO & Routing Changes (END) ---
+
     fs.readFile(filePath, (err, content) => {
         if (err) {
-            console.error('Error reading index.html:', err);
+            // If even the requested file (like index.html) is not found, send a 500 error
+            console.error(`Error reading ${filePath}:`, err);
             res.writeHead(500);
-            res.end('Server Error: Could not load index.html');
+            res.end(`Server Error: Could not load ${path.basename(filePath)}`);
             return;
         }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, { 'Content-Type': contentType });
         res.end(content);
     });
 });
+
 
 // --- ۳. ساخت سرور WebSocket ---
 const wss = new WebSocket.Server({ server });
@@ -61,9 +82,7 @@ wss.on('connection', function connection(ws, req) {
             console.log('Invalid JSON received:', message);
             return;
         }
-
-        // CHANGE START: Check message type BEFORE applying rate limit.
-        // پیام‌های همگام‌سازی ویدیو از محدودیت نرخ ارسال معاف می‌شوند.
+        
         const isSyncMessage = data.type === 'signal' && data.data && data.data.type === 'sync';
 
         if (!isSyncMessage) {
@@ -80,14 +99,11 @@ wss.on('connection', function connection(ws, req) {
             timestamps.push(now);
             messageTimestamps.set(ws, timestamps);
         }
-        // CHANGE END
 
-        // Sanitize chat messages
         if (data.type === 'signal' && data.data && data.data.type === 'chat' && data.data.message) {
             data.data.message = data.data.message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
-        // Handle different message types
         if (data.type === 'register' && data.id) {
             userId = data.id;
             clients[userId] = ws;
@@ -101,7 +117,6 @@ wss.on('connection', function connection(ws, req) {
                 userId = null;
             }
         } else if (data.type === 'signal' && data.to && clients[data.to]) {
-            // Forward the signal to the target client
             clients[data.to].send(JSON.stringify({ ...data, from: userId }));
         }
     });

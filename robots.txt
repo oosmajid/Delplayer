@@ -1,0 +1,6 @@
+# Allow all user agents to crawl the site
+User-agent: *
+Allow: /
+
+# Point to the sitemap file
+Sitemap: https://delplayer.ir/sitemap.xml

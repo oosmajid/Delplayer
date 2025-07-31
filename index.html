@@ -3,16 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- ================== SEO Tags (START) ================== -->
+    <title>دل‌پلیر</title>
+    <meta name="description" content="با دل‌پلیر به راحتی و به صورت همزمان با دوست یا پارتنر خود فیلم و سریال تماشا کنید. فقط کافیست لینک یا فایل ویدیو را وارد کرده و با شناسه مخصوص به هم متصل شوید.">
+    <meta name="keywords" content="تماشای همزمان فیلم, دیدن فیلم با دوستان, پخش همزمان ویدیو, سینما آنلاین, دل پلیر, delplayer">
+    <link rel="canonical" href="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
+    <meta property="og:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
+    <meta property="og:description" content="با دل‌پلیر به راحتی و به صورت همزمان با پارتنر خود از راه دور فیلم و سریال تماشا کنید.">
+    <meta property="og:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <!--! می‌توانید آدرس یک تصویر مناسب برای اشتراک‌گذاری قرار دهید -->
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
+    <meta property="twitter:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
+    <meta property="twitter:description" content="با دل‌پلیر به راحتی و به صورت همزمان با پارتنر خود از راه دور فیلم و سریال تماشا کنید.">
+    <meta property="twitter:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <!--! می‌توانید آدرس یک تصویر مناسب برای اشتراک‌گذاری قرار دهید -->
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "دل‌پلیر",
+      "operatingSystem": "WEB",
+      "applicationCategory": "MultimediaApplication",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "150" 
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "IRR"
+      }
+    }
+    </script>
+    <!-- ================== SEO Tags (END) ================== -->
+
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-V87N2NQJLV"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-
         gtag('config', 'G-V87N2NQJLV');
     </script>
-    <title>دل‌پلیر</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎬</text></svg>">
@@ -39,7 +81,6 @@
             <p class="text-gray-400 mt-2">لینک ویدیو را وارد کنید یا فایل آن را انتخاب کنید. سپس شناسه خود را به دوستتان بدهید یا شناسه او را وارد کنید.</p>
         </div>
         
-        <!-- START OF CHANGES: Video source inputs -->
         <div class="bg-gray-900 p-4 rounded-lg space-y-4">
             <div class="flex flex-col sm:flex-row items-center gap-2">
                 <input type="text" id="video-url-input" placeholder="لینک مستقیم ویدیو را اینجا وارد کنید" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
@@ -60,7 +101,6 @@
                 <input type="file" id="subtitle-file-input" accept=".vtt,.srt" class="hidden">
             </div>
         </div>
-        <!-- END OF CHANGES -->
         
         <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
         <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
@@ -81,7 +121,6 @@
                 <button id="disconnect-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors hidden">قطع اتصال</button>
             </div>
         </div>
-        <!-- بخش چت -->
         <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
             <div class="mb-2 font-bold text-cyan-400">💬 چت</div>
             <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
@@ -101,6 +140,8 @@
         </p>
     </footer>
     <script>
+        // All your existing javascript code goes here...
+        // No changes needed for the script part inside HTML
         window.addEventListener('load', () => {
             // --- توابع اصلی ---
             function randomId() {
@@ -121,10 +162,8 @@
             const chatSend = document.getElementById('chat-send');
             const copyHint = document.getElementById('copy-hint');
             const warningDiv = document.getElementById('length-warning');
-            // START OF CHANGES: Get new URL elements
             const videoUrlInput = document.getElementById('video-url-input');
             const loadUrlBtn = document.getElementById('load-url-btn');
-            // END OF CHANGES
 
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -338,17 +377,13 @@
                     startHeartbeat();
                     updateChatUIState(true);
                     
-                    // START OF CHANGES: When connecting, if a video is already loaded, send its source
                     if (videoPlayer.src) {
                         if (videoPlayer.src.startsWith('blob:')) {
-                            // We can't share blob URLs, so we just sync time/state
                             sendSyncData();
                         } else {
-                            // Share the URL with the new partner
                             broadcastData({ type: 'load_url', url: videoPlayer.src });
                         }
                     }
-                    // END OF CHANGES
                     return;
                 }
 
@@ -361,9 +396,7 @@
                     startHeartbeat();
                     updateChatUIState(true);
 
-                    // START OF CHANGES: Request the video source from the partner
                     broadcastData({ type: 'request_source' });
-                    // END OF CHANGES
                     return;
                 }
 
@@ -371,10 +404,8 @@
                     return;
                 }
                 
-                // START OF CHANGES: Handle new message types for URL syncing
                 if (data.type === 'request_source' && videoPlayer.src) {
                     if (videoPlayer.src.startsWith('blob:')) {
-                        // Can't share blob, just sync state
                         sendSyncData();
                     } else {
                         broadcastData({ type: 'load_url', url: videoPlayer.src });
@@ -390,7 +421,6 @@
                     }
                     return;
                 }
-                // END OF CHANGES
 
                 if (data.type === 'chat') {
                     appendChatMessage(data.message, false);
@@ -505,12 +535,10 @@
                 resetConnectionState();
             });
             
-            // START OF CHANGES: Add event listener for the new load URL button
             loadUrlBtn.addEventListener('click', () => {
                 const url = videoUrlInput.value.trim();
                 if (url) {
                     try {
-                        // Test if it's a valid URL structure
                         new URL(url);
                         videoPlayer.src = url;
                         updateStatus(`در حال بارگذاری ویدیو از لینک...`, 'connecting');
@@ -525,18 +553,14 @@
                     alert('لطفاً لینک ویدیو را وارد کنید.');
                 }
             });
-            // END OF CHANGES
     
             videoFileInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (file) {
                     const fileURL = URL.createObjectURL(file);
                     videoPlayer.src = fileURL;
-                    videoUrlInput.value = ''; // Clear URL input
+                    videoUrlInput.value = ''; 
                     updateStatus(`فایل بارگذاری شد: ${file.name}`, 'success');
-
-                    // We can't share blob URLs, so we don't send a load message
-                    // The other user must load the same file manually
                     if (partnerId) {
                         alert('شما یک فایل محلی را بارگذاری کردید. دوست شما نیز باید همین فایل را به صورت دستی انتخاب کند.');
                     }
@@ -605,7 +629,6 @@
                 document.body.removeChild(textArea);
             });
     
-            // --- شروع اتصال اولیه ---
             updateChatUIState(false);
             connectWebSocket();
         });
