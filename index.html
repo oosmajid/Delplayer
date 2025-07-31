@@ -58,6 +58,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎬</text></svg>">
+    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
@@ -83,7 +84,7 @@
         
         <div class="bg-gray-900 p-4 rounded-lg space-y-4">
             <div class="flex flex-col sm:flex-row items-center gap-2">
-                <input type="text" id="video-url-input" placeholder="لینک مستقیم ویدیو را اینجا وارد کنید" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <input type="text" id="video-url-input" placeholder="لینک مستقیم ویدیو یا لینک یوتیوب را اینجا وارد کنید" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
                 <button id="load-url-btn" class="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md transition-colors flex-shrink-0">بارگذاری لینک</button>
             </div>
             <div class="text-center text-gray-400">یا</div>
@@ -102,7 +103,10 @@
             </div>
         </div>
         
-        <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+        <div id="video-container">
+            <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+            <div id="youtube-player" class="w-full h-[600px] rounded-lg bg-black hidden" style="aspect-ratio: 16/9;"></div>
+        </div>
         <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
             <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
         </div>
@@ -180,8 +184,70 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
+            let youtubePlayer = null;
+            let isYoutubeVideo = false;
 
             myIdSpan.textContent = myId;
+
+            function getYoutubeVideoId(url) {
+                const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = url.match(regExp);
+                return (match && match[2].length === 11) ? match[2] : false;
+            }
+
+            window.onYouTubeIframeAPIReady = function() {
+                youtubePlayer = new YT.Player('youtube-player', {
+                    height: '600',
+                    width: '100%',
+                    playerVars: {
+                        'playsinline': 1,
+                        'controls': 1,
+                        'rel': 0,
+                        'showinfo': 0,
+                        'modestbranding': 1,
+                        'enablejsapi': 1
+                    },
+                    events: {
+                        'onStateChange': onYouTubePlayerStateChange,
+                        'onPlaybackRateChange': onYouTubePlaybackRateChange,
+                        'onReady': function(event) {
+                            console.log('YouTube player is ready');
+                            // در اینجا می‌توانیم مطمئن شویم که پخش‌کننده آماده است
+                            if (isYoutubeVideo) {
+                                document.getElementById('youtube-player').style.display = 'block';
+                                updateStatus('ویدیوی یوتیوب آماده پخش است', 'success');
+                            }
+                        },
+                        'onError': function(event) {
+                            console.error('YouTube player error:', event.data);
+                            updateStatus('خطا در بارگذاری ویدیوی یوتیوب', 'error');
+                        }
+                    }
+                });
+            }
+
+            function onYouTubePlayerStateChange(event) {
+                if (isSyncing) return;
+                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+                    sendYoutubeSyncData();
+                }
+            }
+
+            function onYouTubePlaybackRateChange(event) {
+                if (isSyncing) return;
+                sendYoutubeSyncData();
+            }
+
+            function sendYoutubeSyncData() {
+                if (isSyncing || !partnerId || !youtubePlayer) return;
+                broadcastData({
+                    type: 'youtube_sync',
+                    playing: youtubePlayer.getPlayerState() === YT.PlayerState.PLAYING,
+                    time: youtubePlayer.getCurrentTime(),
+                    rate: youtubePlayer.getPlaybackRate(),
+                    videoId: youtubePlayer.getVideoData().video_id
+                });
+            }
 
             function updateChatUIState(enabled) {
                 chatInput.disabled = !enabled;
@@ -415,10 +481,46 @@
 
                 if (data.type === 'load_url') {
                     if (videoPlayer.src !== data.url) {
+                        isYoutubeVideo = false;
+                        videoPlayer.style.display = 'block';
+                        document.getElementById('youtube-player').style.display = 'none';
                         videoPlayer.src = data.url;
                         videoUrlInput.value = data.url;
                         updateStatus(`ویدیو از طرف مقابل بارگذاری شد`, 'success');
                     }
+                    return;
+                }
+
+                if (data.type === 'load_youtube') {
+                    isYoutubeVideo = true;
+                    videoPlayer.style.display = 'none';
+                    document.getElementById('youtube-player').style.display = 'block';
+                    if (youtubePlayer && youtubePlayer.loadVideoById) {
+                        youtubePlayer.loadVideoById(data.videoId);
+                        setTimeout(() => {
+                            updateStatus(`ویدیوی یوتیوب آماده پخش است`, 'success');
+                        }, 1000);
+                    }
+                    return;
+                }
+
+                if (data.type === 'youtube_sync') {
+                    if (!isYoutubeVideo || !youtubePlayer) return;
+                    isSyncing = true;
+                    if (Math.abs(youtubePlayer.getCurrentTime() - data.time) > 1.5) {
+                        youtubePlayer.seekTo(data.time);
+                    }
+                    if (data.playing && youtubePlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                        youtubePlayer.playVideo();
+                    } else if (!data.playing && youtubePlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+                        youtubePlayer.pauseVideo();
+                    }
+                    if (youtubePlayer.getPlaybackRate() !== data.rate) {
+                        youtubePlayer.setPlaybackRate(data.rate);
+                    }
+                    setTimeout(() => {
+                        isSyncing = false;
+                    }, 200);
                     return;
                 }
 
@@ -540,10 +642,40 @@
                 if (url) {
                     try {
                         new URL(url);
-                        videoPlayer.src = url;
-                        updateStatus(`در حال بارگذاری ویدیو از لینک...`, 'connecting');
-                        if (partnerId) {
-                            broadcastData({ type: 'load_url', url: url });
+                        const youtubeId = getYoutubeVideoId(url);
+                        if (youtubeId) {
+                            isYoutubeVideo = true;
+                            videoPlayer.style.display = 'none';
+                            const youtubeContainer = document.getElementById('youtube-player');
+                            youtubeContainer.style.display = 'block';
+                            if (youtubePlayer && youtubePlayer.loadVideoById) {
+                                youtubePlayer.loadVideoById(youtubeId);
+                                updateStatus(`در حال بارگذاری ویدیوی یوتیوب...`, 'connecting');
+                                setTimeout(() => {
+                                    updateStatus(`ویدیوی یوتیوب آماده پخش است`, 'success');
+                                }, 1000);
+                                if (partnerId) {
+                                    broadcastData({ type: 'load_youtube', videoId: youtubeId });
+                                }
+                            } else {
+                                updateStatus('پخش‌کننده یوتیوب در حال آماده‌سازی است...', 'connecting');
+                                // سعی می‌کنیم دوباره پخش‌کننده را بسازیم
+                                window.onYouTubeIframeAPIReady();
+                                setTimeout(() => {
+                                    if (youtubePlayer && youtubePlayer.loadVideoById) {
+                                        youtubePlayer.loadVideoById(youtubeId);
+                                    }
+                                }, 1000);
+                            }
+                        } else {
+                            isYoutubeVideo = false;
+                            videoPlayer.style.display = 'block';
+                            document.getElementById('youtube-player').style.display = 'none';
+                            videoPlayer.src = url;
+                            updateStatus(`در حال بارگذاری ویدیو از لینک...`, 'connecting');
+                            if (partnerId) {
+                                broadcastData({ type: 'load_url', url: url });
+                            }
                         }
                     } catch (e) {
                         updateStatus('لینک وارد شده معتبر نیست.', 'error');
