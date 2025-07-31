@@ -202,15 +202,13 @@
 
             myIdSpan.textContent = myId;
 
-            // --- توابع جدید برای مدیریت یوتیوب ---
+            // --- توابع مدیریت یوتیوب ---
 
             function getYouTubeVideoId(url) {
                 let videoId = null;
                 const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
                 const match = url.match(regex);
-                if (match) {
-                    videoId = match[1];
-                }
+                if (match) videoId = match[1];
                 return videoId;
             }
 
@@ -234,12 +232,7 @@
                     height: '100%',
                     width: '100%',
                     videoId: videoId,
-                    playerVars: {
-                        'playsinline': 1,
-                        'controls': 1,
-                        'rel': 0,
-                        'modestbranding': 1,
-                    },
+                    playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0, 'modestbranding': 1 },
                     events: {
                         'onReady': onPlayerReady,
                         'onStateChange': onPlayerStateChange,
@@ -250,34 +243,20 @@
 
             function onPlayerReady(event) {
                 updateStatus('پخش‌کننده یوتیوب آماده است.', 'success');
-                sendYouTubeSyncData();
+                sendSyncData();
             }
 
             function onPlayerStateChange(event) {
                 if (isSyncing) return;
-                sendYouTubeSyncData();
+                sendSyncData();
             }
 
             function onPlayerPlaybackRateChange(event) {
                 if (isSyncing) return;
-                sendYouTubeSyncData();
+                sendSyncData();
             }
-
-            function sendYouTubeSyncData() {
-                if (isSyncing || !partnerId || !isYouTubeMode || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
-
-                const state = ytPlayer.getPlayerState();
-                const playing = (state === YT.PlayerState.PLAYING);
-
-                broadcastData({
-                    type: 'youtube_sync',
-                    playing: playing,
-                    value: ytPlayer.getCurrentTime(),
-                    rate: ytPlayer.getPlaybackRate()
-                });
-            }
-
-            // --- توابع موجود (اصلاح شده) ---
+            
+            // --- توابع عمومی ---
 
             function updateChatUIState(enabled) {
                 chatInput.disabled = !enabled;
@@ -444,13 +423,7 @@
                     sendDataTo(fromId, { type: 'connect_confirm' });
                     startHeartbeat();
                     updateChatUIState(true);
-                    
-                    if (isYouTubeMode) {
-                        sendYouTubeSyncData();
-                    } else if (videoPlayer.src) {
-                        if (videoPlayer.src.startsWith('blob:')) sendSyncData();
-                        else broadcastData({ type: 'load_url', url: videoPlayer.src });
-                    }
+                    sendSyncData();
                     return;
                 }
 
@@ -472,9 +445,8 @@
                     if (isYouTubeMode && ytPlayer && typeof ytPlayer.getVideoData === 'function') {
                          const videoId = ytPlayer.getVideoData().video_id;
                          if (videoId) broadcastData({ type: 'load_youtube', videoId: videoId });
-                    } else if (videoPlayer.src) {
-                        if (videoPlayer.src.startsWith('blob:')) sendSyncData();
-                        else broadcastData({ type: 'load_url', url: videoPlayer.src });
+                    } else if (videoPlayer.src && !videoPlayer.src.startsWith('blob:')) {
+                        broadcastData({ type: 'load_url', url: videoPlayer.src });
                     }
                     return;
                 }
@@ -508,57 +480,34 @@
                 }
     
                 if (data.type === 'sync') {
-                    if (isYouTubeMode) return;
                     isSyncing = true;
-                    partnerVideoDuration = data.duration || null;
-                    
-                    if (data.rate && videoPlayer.playbackRate !== data.rate) {
-                        videoPlayer.playbackRate = data.rate;
-                    }
+                    if (data.mode === 'html5' && !isYouTubeMode) {
+                        partnerVideoDuration = data.duration || null;
+                        if (videoPlayer.playbackRate !== data.rate) videoPlayer.playbackRate = data.rate;
+                        if (Math.abs(videoPlayer.currentTime - data.value) > 1.8) videoPlayer.currentTime = data.value;
+                        if (data.playing && videoPlayer.paused) videoPlayer.play().catch(e => {});
+                        else if (!data.playing && !videoPlayer.paused) videoPlayer.pause();
+                        checkVideoLength();
+                        setTimeout(() => { isSyncing = false; }, 500);
 
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.8) {
-                        videoPlayer.currentTime = data.value;
-                    }
-                    
-                    if (data.playing && videoPlayer.paused) {
-                        videoPlayer.play().catch(e => { console.error("Play command failed:", e); });
-                    } else if (!data.playing && !videoPlayer.paused) {
-                        videoPlayer.pause();
-                    }
-                    
-                    checkVideoLength();
-                    setTimeout(() => { isSyncing = false; }, 500);
-                }
-
-                if (data.type === 'youtube_sync') {
-                    if (!isYouTubeMode || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
-                    
-                    isSyncing = true;
-
-                    if (ytPlayer.getPlaybackRate() !== data.rate) {
-                        ytPlayer.setPlaybackRate(data.rate);
-                    }
-
-                    const timeDifference = Math.abs(ytPlayer.getCurrentTime() - data.value);
-                    if (timeDifference > 1.8) {
-                        ytPlayer.seekTo(data.value, true);
-                    }
-
-                    const currentState = ytPlayer.getPlayerState();
-                    const isPlaying = currentState === YT.PlayerState.PLAYING;
-                    const isBuffering = currentState === YT.PlayerState.BUFFERING;
-
-                    if (data.playing) {
-                        if (!isPlaying && !isBuffering) {
-                            ytPlayer.playVideo();
+                    } else if (data.mode === 'youtube' && isYouTubeMode) {
+                        if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') {
+                            isSyncing = false;
+                            return;
                         }
-                    } else {
-                        if (isPlaying) {
+                        if (ytPlayer.getPlaybackRate() !== data.rate) ytPlayer.setPlaybackRate(data.rate);
+                        if (Math.abs(ytPlayer.getCurrentTime() - data.value) > 2.0) ytPlayer.seekTo(data.value, true);
+                        
+                        const currentState = ytPlayer.getPlayerState();
+                        if (data.playing && currentState !== YT.PlayerState.PLAYING) {
+                            ytPlayer.playVideo();
+                        } else if (!data.playing && currentState === YT.PlayerState.PLAYING) {
                             ytPlayer.pauseVideo();
                         }
+                        setTimeout(() => { isSyncing = false; }, 1200);
+                    } else {
+                        isSyncing = false;
                     }
-
-                    setTimeout(() => { isSyncing = false; }, 1200);
                 }
             }
     
@@ -582,25 +531,36 @@
                 chatInput.value = '';
             }
             
-            chatSend.addEventListener('click', sendChatMessage);
-            chatInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChatMessage();
-                }
-            });
-    
+            // --- تابع یکپارچه ارسال وضعیت ---
             function sendSyncData() {
-                if (isYouTubeMode || isSyncing || !partnerId || !videoPlayer.src) return;
-                broadcastData({
-                    type: 'sync',
-                    playing: !videoPlayer.paused,
-                    value: videoPlayer.currentTime,
-                    duration: videoPlayer.duration || 0,
-                    rate: videoPlayer.playbackRate
-                });
+                if (isSyncing || !partnerId) return;
+
+                let syncData;
+                if (isYouTubeMode) {
+                    if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+                    const state = ytPlayer.getPlayerState();
+                    syncData = {
+                        type: 'sync',
+                        mode: 'youtube',
+                        playing: (state === YT.PlayerState.PLAYING),
+                        value: ytPlayer.getCurrentTime(),
+                        rate: ytPlayer.getPlaybackRate()
+                    };
+                } else {
+                    if (!videoPlayer.src) return;
+                    syncData = {
+                        type: 'sync',
+                        mode: 'html5',
+                        playing: !videoPlayer.paused,
+                        value: videoPlayer.currentTime,
+                        duration: videoPlayer.duration || 0,
+                        rate: videoPlayer.playbackRate
+                    };
+                }
+                broadcastData(syncData);
             }
     
+            // --- Event Listeners ---
             videoPlayer.addEventListener('play', sendSyncData);
             videoPlayer.addEventListener('pause', sendSyncData);
             videoPlayer.addEventListener('seeked', sendSyncData);
@@ -737,6 +697,14 @@
                 document.body.removeChild(textArea);
             });
     
+            chatSend.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+            
             updateChatUIState(false);
             connectWebSocket();
         });
