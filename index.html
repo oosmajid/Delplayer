@@ -206,6 +206,7 @@
             // --- متغیرهای پلیر ---
             let ytPlayer;
             let currentPlayerType = 'html5'; // 'html5' or 'youtube'
+            let currentYouTubeVideoId = null; // برای نگهداری شناسه ویدیوی یوتیوب
 
             myIdSpan.textContent = myId;
 
@@ -381,8 +382,8 @@
                     if (currentPlayerType === 'html5' && videoPlayer.src) {
                         if (videoPlayer.src.startsWith('blob:')) sendSyncData();
                         else broadcastData({ type: 'load_url', url: videoPlayer.src });
-                    } else if (currentPlayerType === 'youtube' && ytPlayer) {
-                         broadcastData({ type: 'youtube_load', videoId: ytPlayer.getVideoData().video_id });
+                    } else if (currentPlayerType === 'youtube' && currentYouTubeVideoId) {
+                         broadcastData({ type: 'youtube_load', videoId: currentYouTubeVideoId });
                     }
                     return;
                 }
@@ -405,8 +406,8 @@
                     if (currentPlayerType === 'html5' && videoPlayer.src) {
                         if (videoPlayer.src.startsWith('blob:')) sendSyncData();
                         else broadcastData({ type: 'load_url', url: videoPlayer.src });
-                    } else if (currentPlayerType === 'youtube' && ytPlayer && ytPlayer.getVideoData) {
-                         broadcastData({ type: 'youtube_load', videoId: ytPlayer.getVideoData().video_id });
+                    } else if (currentPlayerType === 'youtube' && currentYouTubeVideoId) {
+                         broadcastData({ type: 'youtube_load', videoId: currentYouTubeVideoId });
                     }
                     return;
                 }
@@ -524,25 +525,29 @@
             
             loadUrlBtn.addEventListener('click', () => {
                 const url = videoUrlInput.value.trim();
-                if (!url) { alert('لطفاً لینک ویدیو را وارد کنید.'); return; }
+                if (!url) {
+                    alert('لطفاً لینک ویدیو را وارد کنید.');
+                    return;
+                }
                 
-                const youtubeId = getYouTubeId(url);
-                if (youtubeId) {
-                    switchToYouTubePlayer(youtubeId);
-                    if (partnerId) {
-                        broadcastData({ type: 'youtube_load', videoId: youtubeId });
-                    }
-                } else {
-                    try {
-                        new URL(url);
+                try {
+                    const youtubeId = getYouTubeId(url);
+                    if (youtubeId) {
+                        switchToYouTubePlayer(youtubeId);
+                        if (partnerId) {
+                            broadcastData({ type: 'youtube_load', videoId: youtubeId });
+                        }
+                    } else {
+                        new URL(url); // برای بررسی معتبر بودن URL
                         switchToHtml5Player(url);
                         if (partnerId) {
                             broadcastData({ type: 'load_url', url: url });
                         }
-                    } catch (e) {
-                        updateStatus('لینک وارد شده معتبر نیست.', 'error');
-                        alert('لطفاً یک لینک معتبر (مستقیم یا یوتیوب) وارد کنید.');
                     }
+                } catch (e) {
+                    updateStatus('لینک وارد شده معتبر نیست.', 'error');
+                    alert('لطفاً یک لینک معتبر (مستقیم یا یوتیوب) وارد کنید.');
+                    console.error("Failed to load URL:", e);
                 }
             });
     
@@ -623,6 +628,7 @@
 
             // --- توابع مدیریت پلیر ---
             function switchToHtml5Player(url, isFile = false) {
+                currentYouTubeVideoId = null;
                 currentPlayerType = 'html5';
                 if (ytPlayer) {
                     ytPlayer.stopVideo();
@@ -644,6 +650,7 @@
                     setTimeout(() => switchToYouTubePlayer(videoId), 100);
                     return;
                 }
+                currentYouTubeVideoId = videoId;
                 currentPlayerType = 'youtube';
                 videoPlayer.pause();
                 videoPlayer.style.display = 'none';
