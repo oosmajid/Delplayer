@@ -242,7 +242,8 @@
                     },
                     events: {
                         'onReady': onPlayerReady,
-                        'onStateChange': onPlayerStateChange
+                        'onStateChange': onPlayerStateChange,
+                        'onPlaybackRateChange': onPlayerPlaybackRateChange
                     }
                 });
             }
@@ -253,6 +254,11 @@
             }
 
             function onPlayerStateChange(event) {
+                if (isSyncing) return;
+                sendYouTubeSyncData();
+            }
+
+            function onPlayerPlaybackRateChange(event) {
                 if (isSyncing) return;
                 sendYouTubeSyncData();
             }
@@ -510,18 +516,18 @@
                         videoPlayer.playbackRate = data.rate;
                     }
 
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.8) {
                         videoPlayer.currentTime = data.value;
                     }
                     
                     if (data.playing && videoPlayer.paused) {
-                        videoPlayer.play().catch(e => {});
+                        videoPlayer.play().catch(e => { console.error("Play command failed:", e); });
                     } else if (!data.playing && !videoPlayer.paused) {
                         videoPlayer.pause();
                     }
                     
                     checkVideoLength();
-                    setTimeout(() => { isSyncing = false; }, 400);
+                    setTimeout(() => { isSyncing = false; }, 500);
                 }
 
                 if (data.type === 'youtube_sync') {
@@ -534,20 +540,18 @@
                     }
 
                     const timeDifference = Math.abs(ytPlayer.getCurrentTime() - data.value);
-                    const currentState = ytPlayer.getPlayerState();
-                    const isPlaying = (currentState === YT.PlayerState.PLAYING);
-
-                    if (timeDifference > 1.5) {
+                    if (timeDifference > 1.8) {
                         ytPlayer.seekTo(data.value, true);
-                    } else {
-                        if (data.playing && !isPlaying) {
-                            ytPlayer.playVideo();
-                        } else if (!data.playing && isPlaying) {
-                            ytPlayer.pauseVideo();
-                        }
                     }
 
-                    setTimeout(() => { isSyncing = false; }, 700);
+                    const currentState = ytPlayer.getPlayerState();
+                    if (data.playing && currentState !== YT.PlayerState.PLAYING && currentState !== YT.PlayerState.BUFFERING) {
+                        ytPlayer.playVideo();
+                    } else if (!data.playing && currentState === YT.PlayerState.PLAYING) {
+                        ytPlayer.pauseVideo();
+                    }
+
+                    setTimeout(() => { isSyncing = false; }, 800);
                 }
             }
     
