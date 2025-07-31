@@ -127,7 +127,7 @@
             </div>
         </div>
         <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
-            <div class="mb-2 font-bold text-cyan-400">� چت</div>
+            <div class="mb-2 font-bold text-cyan-400">&#128172; چت</div>
             <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
             <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <input id="chat-input" type="text" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید...">
@@ -505,23 +505,49 @@
                     if (isYouTubeMode) return;
                     isSyncing = true;
                     partnerVideoDuration = data.duration || null;
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) videoPlayer.currentTime = data.value;
-                    if (data.playing && videoPlayer.paused) videoPlayer.play().catch(e => {});
-                    else if (!data.playing && !videoPlayer.paused) videoPlayer.pause();
-                    if (data.rate && videoPlayer.playbackRate !== data.rate) videoPlayer.playbackRate = data.rate;
+                    
+                    if (data.rate && videoPlayer.playbackRate !== data.rate) {
+                        videoPlayer.playbackRate = data.rate;
+                    }
+
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
+                        videoPlayer.currentTime = data.value;
+                    }
+                    
+                    if (data.playing && videoPlayer.paused) {
+                        videoPlayer.play().catch(e => {});
+                    } else if (!data.playing && !videoPlayer.paused) {
+                        videoPlayer.pause();
+                    }
+                    
                     checkVideoLength();
-                    setTimeout(() => { isSyncing = false; }, 200);
+                    setTimeout(() => { isSyncing = false; }, 400);
                 }
 
                 if (data.type === 'youtube_sync') {
                     if (!isYouTubeMode || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+                    
                     isSyncing = true;
-                    if (ytPlayer.getPlaybackRate() !== data.rate) ytPlayer.setPlaybackRate(data.rate);
-                    if (Math.abs(ytPlayer.getCurrentTime() - data.value) > 1.5) ytPlayer.seekTo(data.value, true);
+
+                    if (ytPlayer.getPlaybackRate() !== data.rate) {
+                        ytPlayer.setPlaybackRate(data.rate);
+                    }
+
+                    const timeDifference = Math.abs(ytPlayer.getCurrentTime() - data.value);
                     const currentState = ytPlayer.getPlayerState();
-                    if (data.playing && currentState !== YT.PlayerState.PLAYING) ytPlayer.playVideo();
-                    else if (!data.playing && currentState === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
-                    setTimeout(() => { isSyncing = false; }, 500);
+                    const isPlaying = (currentState === YT.PlayerState.PLAYING);
+
+                    if (timeDifference > 1.5) {
+                        ytPlayer.seekTo(data.value, true);
+                    } else {
+                        if (data.playing && !isPlaying) {
+                            ytPlayer.playVideo();
+                        } else if (!data.playing && isPlaying) {
+                            ytPlayer.pauseVideo();
+                        }
+                    }
+
+                    setTimeout(() => { isSyncing = false; }, 700);
                 }
             }
     
