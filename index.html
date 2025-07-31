@@ -7,7 +7,7 @@
     <!-- ================== SEO Tags (START) ================== -->
     <title>دل‌پلیر</title>
     <meta name="description" content="با دل‌پلیر به راحتی و به صورت همزمان با دوست یا پارتنر خود فیلم و سریال تماشا کنید. فقط کافیست لینک یا فایل ویدیو را وارد کرده و با شناسه مخصوص به هم متصل شوید.">
-    <meta name="keywords" content="تماشای همزمان فیلم, دیدن فیلم با دوستان, پخش همزمان ویدیو, سینما آنلاین, دل پلیر, delplayer, تماشای همزمان یوتیوب">
+    <meta name="keywords" content="تماشای همزمان فیلم, دیدن فیلم با دوستان, پخش همزمان ویدیو, سینما آنلاین, دل پلیر, delplayer">
     <link rel="canonical" href="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
 
     <!-- Open Graph / Facebook -->
@@ -62,20 +62,15 @@
         body {
             font-family: 'Vazirmatn', sans-serif;
         }
-        #player-container {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
-            background-color: black;
-            border-radius: 0.5rem; /* rounded-lg */
+        video::-webkit-media-controls-timeline {
+            background-color: rgba(0, 123, 255, 0.5);
+            border-radius: 4px;
+            height: 8px;
         }
-        #my-video, #youtube-player-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 0.5rem;
+        video::-webkit-media-controls-current-time-display,
+        video::-webkit-media-controls-time-remaining-display {
+            color: #fff;
+            text-shadow: 1px 1px 2px black;
         }
     </style>
 </head>
@@ -88,7 +83,7 @@
         
         <div class="bg-gray-900 p-4 rounded-lg space-y-4">
             <div class="flex flex-col sm:flex-row items-center gap-2">
-                <input type="text" id="video-url-input" placeholder="لینک مستقیم ویدیو یا لینک یوتیوب را اینجا وارد کنید" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <input type="text" id="video-url-input" placeholder="لینک مستقیم ویدیو را اینجا وارد کنید" class="w-full bg-gray-700 border border-gray-600 rounded-md px-4 py-2 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
                 <button id="load-url-btn" class="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md transition-colors flex-shrink-0">بارگذاری لینک</button>
             </div>
             <div class="text-center text-gray-400">یا</div>
@@ -107,11 +102,7 @@
             </div>
         </div>
         
-        <div id="player-container">
-            <video id="my-video" class="w-full h-full" controls></video>
-            <div id="youtube-player-container" class="w-full h-full" style="display: none;"></div>
-        </div>
-
+        <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
         <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
             <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
         </div>
@@ -148,30 +139,17 @@
             ☕
         </p>
     </footer>
-    
-    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // --- فراخوانی زمانی که API یوتیوب آماده است ---
-        let isYouTubeApiReady = false;
-        function onYouTubeIframeAPIReady() {
-            isYouTubeApiReady = true;
-        }
-
+        // All your existing javascript code goes here...
+        // No changes needed for the script part inside HTML
         window.addEventListener('load', () => {
             // --- توابع اصلی ---
             function randomId() {
                 return Math.random().toString(36).substring(2, 9);
             }
 
-            function getYouTubeId(url) {
-                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-                const match = url.match(regExp);
-                return (match && match[2].length === 11) ? match[2] : null;
-            }
-
             // --- انتخاب عناصر DOM ---
             const videoPlayer = document.getElementById('my-video');
-            const youtubePlayerContainer = document.getElementById('youtube-player-container');
             const videoFileInput = document.getElementById('video-file-input');
             const subtitleFileInput = document.getElementById('subtitle-file-input');
             const myIdSpan = document.getElementById('my-id');
@@ -202,11 +180,6 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
-            
-            // --- متغیرهای پلیر ---
-            let ytPlayer;
-            let currentPlayerType = 'html5'; // 'html5' or 'youtube'
-            let currentYouTubeVideoId = null; // برای نگهداری شناسه ویدیوی یوتیوب
 
             myIdSpan.textContent = myId;
 
@@ -242,8 +215,12 @@
     
                 ws.onopen = () => {
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
-                    if (!partnerId) updateStatus(`آماده`, 'success');
-                    else updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
+                    
+                    if (!partnerId) {
+                         updateStatus(`آماده`, 'success');
+                    } else {
+                         updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
+                    }
                     reconnectAttempts = 0; 
                 };
     
@@ -261,8 +238,13 @@
                 ws.onclose = () => {
                     const delay = Math.min(MAX_RECONNECT_INTERVAL, Math.pow(2, reconnectAttempts) * 1000);
                     reconnectAttempts++;
+                    
                     updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
-                    if (!partnerId) resetConnectionState();
+                    
+                    if (!partnerId) {
+                        resetConnectionState();
+                    }
+                    
                     setTimeout(connectWebSocket, delay);
                 };
     
@@ -282,9 +264,7 @@
             }
             
             function resetConnectionState(reason = 'اتصال قطع شد') {
-                if(currentPlayerType === 'html5') videoPlayer.pause();
-                else if(ytPlayer) ytPlayer.pauseVideo();
-
+                videoPlayer.pause();
                 if (document.fullscreenElement) {
                     document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
                 }
@@ -313,20 +293,27 @@
             }
 
             function startHeartbeat() {
-                if (heartbeatInterval) clearInterval(heartbeatInterval);
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                }
                 lastPongReceivedTime = Date.now();
+                
                 heartbeatInterval = setInterval(() => {
                     if (!partnerId) {
                         clearInterval(heartbeatInterval);
                         return;
                     }
+
                     if (Date.now() - lastPongReceivedTime > 8000) {
-                        console.error("Heartbeat failed. Peer seems disconnected.");
+                        console.error("Heartbeat failed. Peer seems disconnected. Waiting for them to return.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
                         updateChatUIState(false);
-                        if(currentPlayerType === 'html5') videoPlayer.pause();
-                        else if(ytPlayer) ytPlayer.pauseVideo();
-                        if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                        
+                        videoPlayer.pause();
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                        }
+                        
                         clearInterval(heartbeatInterval);
                         heartbeatInterval = null; 
                         return;
@@ -344,7 +331,11 @@
                         return;
                     }
                 }
-                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
                 oscillator.connect(gainNode);
@@ -365,8 +356,15 @@
                     startHeartbeat();
                 }
 
-                if (data.type === 'ping') { sendDataTo(fromId, { type: 'pong' }); return; }
-                if (data.type === 'pong' && fromId === partnerId) { lastPongReceivedTime = Date.now(); return; }
+                if (data.type === 'ping') {
+                    sendDataTo(fromId, { type: 'pong' });
+                    return;
+                }
+
+                if (data.type === 'pong' && fromId === partnerId) {
+                    lastPongReceivedTime = Date.now();
+                    return;
+                }
 
                 if (data.type === 'connect_request') {
                     partnerId = fromId;
@@ -379,11 +377,12 @@
                     startHeartbeat();
                     updateChatUIState(true);
                     
-                    if (currentPlayerType === 'html5' && videoPlayer.src) {
-                        if (videoPlayer.src.startsWith('blob:')) sendSyncData();
-                        else broadcastData({ type: 'load_url', url: videoPlayer.src });
-                    } else if (currentPlayerType === 'youtube' && currentYouTubeVideoId) {
-                         broadcastData({ type: 'youtube_load', videoId: currentYouTubeVideoId });
+                    if (videoPlayer.src) {
+                        if (videoPlayer.src.startsWith('blob:')) {
+                            sendSyncData();
+                        } else {
+                            broadcastData({ type: 'load_url', url: videoPlayer.src });
+                        }
                     }
                     return;
                 }
@@ -396,57 +395,61 @@
                     disconnectBtn.classList.remove('hidden');
                     startHeartbeat();
                     updateChatUIState(true);
+
                     broadcastData({ type: 'request_source' });
                     return;
                 }
 
-                if (fromId !== partnerId) return;
+                if (fromId !== partnerId) {
+                    return;
+                }
                 
-                if (data.type === 'request_source') {
-                    if (currentPlayerType === 'html5' && videoPlayer.src) {
-                        if (videoPlayer.src.startsWith('blob:')) sendSyncData();
-                        else broadcastData({ type: 'load_url', url: videoPlayer.src });
-                    } else if (currentPlayerType === 'youtube' && currentYouTubeVideoId) {
-                         broadcastData({ type: 'youtube_load', videoId: currentYouTubeVideoId });
+                if (data.type === 'request_source' && videoPlayer.src) {
+                    if (videoPlayer.src.startsWith('blob:')) {
+                        sendSyncData();
+                    } else {
+                        broadcastData({ type: 'load_url', url: videoPlayer.src });
                     }
                     return;
                 }
-                
+
                 if (data.type === 'load_url') {
-                    switchToHtml5Player(data.url);
-                    videoUrlInput.value = data.url;
-                    updateStatus(`ویدیو از طرف مقابل بارگذاری شد`, 'success');
+                    if (videoPlayer.src !== data.url) {
+                        videoPlayer.src = data.url;
+                        videoUrlInput.value = data.url;
+                        updateStatus(`ویدیو از طرف مقابل بارگذاری شد`, 'success');
+                    }
                     return;
                 }
 
-                if (data.type === 'youtube_load') {
-                    switchToYouTubePlayer(data.videoId);
-                    updateStatus(`ویدیوی یوتیوب از طرف مقابل بارگذاری شد`, 'success');
+                if (data.type === 'chat') {
+                    appendChatMessage(data.message, false);
+                    playNotificationSound();
                     return;
                 }
-
-                if (data.type === 'chat') { appendChatMessage(data.message, false); playNotificationSound(); return; }
-                if (data.type === 'disconnect') { resetConnectionState('اتصال توسط طرف مقابل قطع شد'); return; }
+                if (data.type === 'disconnect') {
+                    resetConnectionState('اتصال توسط طرف مقابل قطع شد');
+                    return;
+                }
     
-                if (data.type === 'sync' && currentPlayerType === 'html5') {
+                if (data.type === 'sync') {
                     isSyncing = true;
                     partnerVideoDuration = data.duration || null;
-                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) videoPlayer.currentTime = data.value;
-                    if (data.playing && videoPlayer.paused) videoPlayer.play().catch(e => {});
-                    else if (!data.playing && !videoPlayer.paused) videoPlayer.pause();
-                    if (data.rate && videoPlayer.playbackRate !== data.rate) videoPlayer.playbackRate = data.rate;
+                    if (Math.abs(videoPlayer.currentTime - data.value) > 1.5) {
+                        videoPlayer.currentTime = data.value;
+                    }
+                    if (data.playing && videoPlayer.paused) {
+                        videoPlayer.play().catch(e => {});
+                    } else if (!data.playing && !videoPlayer.paused) {
+                        videoPlayer.pause();
+                    }
+                    if (data.rate && videoPlayer.playbackRate !== data.rate) {
+                        videoPlayer.playbackRate = data.rate;
+                    }
                     checkVideoLength();
-                    setTimeout(() => { isSyncing = false; }, 200);
-                }
-
-                if (data.type === 'youtube_sync' && currentPlayerType === 'youtube' && ytPlayer) {
-                    isSyncing = true;
-                    if (Math.abs(ytPlayer.getCurrentTime() - data.value) > 1.5) ytPlayer.seekTo(data.value, true);
-                    const playerState = ytPlayer.getPlayerState();
-                    if (data.playing && playerState !== YT.PlayerState.PLAYING && playerState !== YT.PlayerState.BUFFERING) ytPlayer.playVideo();
-                    else if (!data.playing && playerState === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
-                    if (data.rate && ytPlayer.getPlaybackRate() !== data.rate) ytPlayer.setPlaybackRate(data.rate);
-                    setTimeout(() => { isSyncing = false; }, 500);
+                    setTimeout(() => {
+                        isSyncing = false;
+                    }, 200);
                 }
             }
     
@@ -471,18 +474,22 @@
             }
             
             chatSend.addEventListener('click', sendChatMessage);
-            chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
     
             function sendSyncData() {
-                if (isSyncing || !partnerId || !videoPlayer.src || currentPlayerType !== 'html5') return;
-                broadcastData({ type: 'sync', playing: !videoPlayer.paused, value: videoPlayer.currentTime, duration: videoPlayer.duration || 0, rate: videoPlayer.playbackRate });
-            }
-
-            function sendYouTubeSyncData() {
-                if (isSyncing || !partnerId || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function' || currentPlayerType !== 'youtube') return;
-                const state = ytPlayer.getPlayerState();
-                if (state === YT.PlayerState.UNSTARTED || state === -1) return;
-                broadcastData({ type: 'youtube_sync', playing: state === YT.PlayerState.PLAYING, value: ytPlayer.getCurrentTime(), rate: ytPlayer.getPlaybackRate() });
+                if (isSyncing || !partnerId || !videoPlayer.src) return;
+                broadcastData({
+                    type: 'sync',
+                    playing: !videoPlayer.paused,
+                    value: videoPlayer.currentTime,
+                    duration: videoPlayer.duration || 0,
+                    rate: videoPlayer.playbackRate
+                });
             }
     
             videoPlayer.addEventListener('play', sendSyncData);
@@ -491,15 +498,12 @@
             videoPlayer.addEventListener('ratechange', sendSyncData);
     
             function checkVideoLength() {
-                if (currentPlayerType !== 'html5') {
-                    warningDiv.style.display = 'none';
-                    return;
-                }
                 const myDuration = videoPlayer.duration || null;
                 if (!partnerId || !videoPlayer.src || partnerVideoDuration === null || myDuration === null || isNaN(myDuration) || isNaN(partnerVideoDuration)) {
                     warningDiv.style.display = 'none';
                     return;
                 }
+
                 if (Math.abs(myDuration - partnerVideoDuration) > 1.5) {
                     warningDiv.textContent = '⚠️ طول ویدیوی شما و طرف مقابل یکسان نیست. لطفاً هر دو یک فایل یکسان انتخاب کنید.';
                     warningDiv.style.display = 'block';
@@ -512,42 +516,41 @@
     
             connectBtn.addEventListener('click', () => {
                 const idToConnect = partnerIdInput.value.trim();
-                if (!idToConnect) { alert('لطفا شناسه دوستتان را وارد کنید.'); return; }
-                if (idToConnect === myId) { alert('نمی‌توانید به خودتان متصل شوید.'); return; }
+                if (!idToConnect) {
+                    alert('لطفا شناسه دوستتان را وارد کنید.');
+                    return;
+                }
+                if (idToConnect === myId) {
+                    alert('نمی‌توانید به خودتان متصل شوید.');
+                    return;
+                }
                 updateStatus(`درخواست اتصال به ${idToConnect} ارسال شد...`, 'connecting');
                 sendDataTo(idToConnect, { type: 'connect_request' });
             });
 
             disconnectBtn.addEventListener('click', () => {
-                if (partnerId) sendDataTo(partnerId, { type: 'disconnect' });
+                if (partnerId) {
+                    sendDataTo(partnerId, { type: 'disconnect' });
+                }
                 resetConnectionState();
             });
             
             loadUrlBtn.addEventListener('click', () => {
                 const url = videoUrlInput.value.trim();
-                if (!url) {
-                    alert('لطفاً لینک ویدیو را وارد کنید.');
-                    return;
-                }
-                
-                try {
-                    const youtubeId = getYouTubeId(url);
-                    if (youtubeId) {
-                        switchToYouTubePlayer(youtubeId);
-                        if (partnerId) {
-                            broadcastData({ type: 'youtube_load', videoId: youtubeId });
-                        }
-                    } else {
-                        new URL(url); // برای بررسی معتبر بودن URL
-                        switchToHtml5Player(url);
+                if (url) {
+                    try {
+                        new URL(url);
+                        videoPlayer.src = url;
+                        updateStatus(`در حال بارگذاری ویدیو از لینک...`, 'connecting');
                         if (partnerId) {
                             broadcastData({ type: 'load_url', url: url });
                         }
+                    } catch (e) {
+                        updateStatus('لینک وارد شده معتبر نیست.', 'error');
+                        alert('لطفاً یک لینک معتبر وارد کنید.');
                     }
-                } catch (e) {
-                    updateStatus('لینک وارد شده معتبر نیست.', 'error');
-                    alert('لطفاً یک لینک معتبر (مستقیم یا یوتیوب) وارد کنید.');
-                    console.error("Failed to load URL:", e);
+                } else {
+                    alert('لطفاً لینک ویدیو را وارد کنید.');
                 }
             });
     
@@ -555,7 +558,7 @@
                 const file = event.target.files[0];
                 if (file) {
                     const fileURL = URL.createObjectURL(file);
-                    switchToHtml5Player(fileURL, true);
+                    videoPlayer.src = fileURL;
                     videoUrlInput.value = ''; 
                     updateStatus(`فایل بارگذاری شد: ${file.name}`, 'success');
                     if (partnerId) {
@@ -625,72 +628,6 @@
                 }
                 document.body.removeChild(textArea);
             });
-
-            // --- توابع مدیریت پلیر ---
-            function switchToHtml5Player(url, isFile = false) {
-                currentYouTubeVideoId = null;
-                currentPlayerType = 'html5';
-                if (ytPlayer) {
-                    ytPlayer.stopVideo();
-                    ytPlayer.destroy();
-                    ytPlayer = null;
-                }
-                youtubePlayerContainer.style.display = 'none';
-                videoPlayer.style.display = 'block';
-                if (videoPlayer.src !== url) {
-                     videoPlayer.src = url;
-                }
-                if (!isFile) {
-                    updateStatus(`در حال بارگذاری ویدیو از لینک...`, 'connecting');
-                }
-            }
-
-            function switchToYouTubePlayer(videoId) {
-                if (!isYouTubeApiReady) {
-                    setTimeout(() => switchToYouTubePlayer(videoId), 100);
-                    return;
-                }
-                currentYouTubeVideoId = videoId;
-                currentPlayerType = 'youtube';
-                videoPlayer.pause();
-                videoPlayer.style.display = 'none';
-                youtubePlayerContainer.style.display = 'block';
-                
-                if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
-                    ytPlayer.loadVideoById(videoId);
-                } else {
-                    if (ytPlayer) ytPlayer.destroy();
-                    ytPlayer = new YT.Player('youtube-player-container', {
-                        height: '100%',
-                        width: '100%',
-                        videoId: videoId,
-                        playerVars: {
-                            'playsinline': 1,
-                            'controls': 1,
-                            'rel': 0,
-                            'modestbranding': 1
-                        },
-                        events: {
-                            'onReady': onPlayerReady,
-                            'onStateChange': onPlayerStateChange,
-                            'onPlaybackRateChange': onPlayerPlaybackRateChange
-                        }
-                    });
-                }
-            }
-
-            function onPlayerReady(event) {
-                updateStatus('ویدیوی یوتیوب با موفقیت بارگذاری شد.', 'success');
-                sendYouTubeSyncData();
-            }
-
-            function onPlayerStateChange(event) {
-                sendYouTubeSyncData();
-            }
-            
-            function onPlayerPlaybackRateChange(event) {
-                sendYouTubeSyncData();
-            }
     
             updateChatUIState(false);
             connectWebSocket();
