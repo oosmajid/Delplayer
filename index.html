@@ -545,13 +545,20 @@
                     }
 
                     const currentState = ytPlayer.getPlayerState();
-                    if (data.playing && currentState !== YT.PlayerState.PLAYING && currentState !== YT.PlayerState.BUFFERING) {
-                        ytPlayer.playVideo();
-                    } else if (!data.playing && currentState === YT.PlayerState.PLAYING) {
-                        ytPlayer.pauseVideo();
+                    const isPlaying = currentState === YT.PlayerState.PLAYING;
+                    const isBuffering = currentState === YT.PlayerState.BUFFERING;
+
+                    if (data.playing) {
+                        if (!isPlaying && !isBuffering) {
+                            ytPlayer.playVideo();
+                        }
+                    } else {
+                        if (isPlaying) {
+                            ytPlayer.pauseVideo();
+                        }
                     }
 
-                    setTimeout(() => { isSyncing = false; }, 800);
+                    setTimeout(() => { isSyncing = false; }, 1200);
                 }
             }
     
