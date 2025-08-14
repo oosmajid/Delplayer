@@ -347,7 +347,9 @@
                     const delay = Math.min(MAX_RECONNECT_INTERVAL, Math.pow(2, reconnectAttempts) * 1000);
                     reconnectAttempts++;
                     updateStatus(`ارتباط با سرور قطع شد. تلاش مجدد تا ${Math.round(delay / 1000)} ثانیه دیگر...`, 'error');
-                    if (!partnerId) resetConnectionState();
+                    if (!partnerId) {
+                        resetConnectionState('اتصال با سرور قطع شد', false);
+                    }
                     setTimeout(connectWebSocket, delay);
                 };
     
@@ -366,7 +368,7 @@
                 sendDataTo(partnerId, data);
             }
             
-            function resetConnectionState(reason = 'اتصال قطع شد') {
+            function resetConnectionState(reason = 'اتصال قطع شد', regenerateId = true) {
                 videoPlayer.pause();
                 if (isYouTubeMode && ytPlayer) ytPlayer.pauseVideo();
                 if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
@@ -382,13 +384,12 @@
                 heartbeatInterval = null;
                 updateChatUIState(false);
 
-                if (ws && ws.readyState === WebSocket.OPEN && myId) {
-                    ws.send(JSON.stringify({ type: 'unregister', id: myId }));
-                }
-                myId = randomId();
-                myIdSpan.textContent = myId;
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'register', id: myId }));
+                if (regenerateId) {
+                    if (ws && ws.readyState === WebSocket.OPEN && myId) {
+                        ws.send(JSON.stringify({ type: 'unregister', id: myId }));
+                    }
+                    myId = randomId();
+                    myIdSpan.textContent = myId;
                 }
             }
 
