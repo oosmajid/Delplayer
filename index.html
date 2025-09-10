@@ -395,12 +395,19 @@
                 heartbeatInterval = null;
                 updateChatUIState(false);
 
-                if (regenerateId) {
-                    if (ws && ws.readyState === WebSocket.OPEN && myId) {
+                if (regenerateId && ws && ws.readyState === WebSocket.OPEN) {
+                    // ۱. ثبت‌نام شناسه قدیمی را لغو کن
+                    if (myId) {
                         ws.send(JSON.stringify({ type: 'unregister', id: myId }));
                     }
+                    
+                    // ۲. یک شناسه جدید بساز
                     myId = randomId();
                     myIdSpan.textContent = myId;
+                    
+                    // ۳. *** مرحله کلیدی و اصلاح شده: شناسه جدید را بلافاصله در سرور ثبت کن ***
+                    ws.send(JSON.stringify({ type: 'register', id: myId }));
+                    console.log(`Re-registered with new ID: ${myId}`);
                 }
             }
 
