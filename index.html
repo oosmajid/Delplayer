@@ -588,31 +588,46 @@
             }
     
             function appendChatMessage(data, isMe) {
-                const { message, messageId, replyTo } = data; // دریافت اطلاعات کامل پیام
+                const { message, messageId, replyTo } = data;
 
                 const wrapper = document.createElement('div');
                 const msgDiv = document.createElement('div');
                 const replyButton = document.createElement('button');
 
-                // ساخت آیکون ریپلای با SVG
-                replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
-                // دکمه به صورت پیش‌فرض شفاف است و با هاور روی کادر پیام (که کلاس group دارد) ظاهر می‌شود
-                replyButton.className = 'absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-white bg-black bg-opacity-20 hover:bg-opacity-40 transition-opacity opacity-0 group-hover:opacity-100';
-                replyButton.style[isMe ? 'left' : 'right'] = '8px'; // موقعیت دکمه در داخل کادر پیام
+                // --- دکمه ریپلای ---
+                // آیکون SVG برای دکمه
+                replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
+                
+                // کلاس‌های Tailwind: دکمه به صورت نیمه‌شفاف وجود دارد و با هاور کاملاً واضح می‌شود
+                replyButton.className = 'absolute top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-200 transition-opacity opacity-40 group-hover:opacity-100 focus:opacity-100';
+                
+                // موقعیت دکمه در سمت مخالف متن (چپ برای پیام‌های شما، راست برای دیگران)
+                if (isMe) {
+                    replyButton.style.left = '8px';
+                } else {
+                    replyButton.style.right = '8px';
+                }
+
                 replyButton.onclick = () => {
                     replyingTo = { id: messageId, text: message };
                     updateReplyPreview();
                     chatInput.focus();
                 };
 
-                // ساخت پیام اصلی
-                msgDiv.textContent = message;
-                msgDiv.style.direction = 'rtl';
-                // *** اصلاح کلیدی: کلاس 'group' به این قسمت اضافه شده است ***
+                // --- کادر اصلی پیام ---
+                // **مهم:** کلاس 'group' و 'relative' اینجا ضروری است
                 msgDiv.className = `group relative px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
-                msgDiv.id = messageId; // تخصیص ID به پیام
+                msgDiv.id = messageId;
                 
-                // اگر پیام یک ریپلای بود، باکس ریپلای را اضافه کن
+                // قرار دادن متن پیام در یک تگ span تا دکمه روی آن قرار نگیرد
+                const textSpan = document.createElement('span');
+                textSpan.textContent = message;
+                textSpan.style.padding = isMe ? '0 0 0 30px' : '0 30px 0 0'; // ایجاد فاصله برای دکمه
+                
+                msgDiv.appendChild(textSpan);
+                msgDiv.appendChild(replyButton); // افزودن دکمه به کادر پیام
+
+                // --- باکس ریپلای (در صورت وجود) ---
                 if (replyTo) {
                     const replyBox = document.createElement('div');
                     replyBox.className = 'bg-black bg-opacity-20 p-2 rounded-md mb-2 border-l-2 border-cyan-400 cursor-pointer hover:bg-opacity-30';
@@ -621,36 +636,20 @@
                         const originalMessage = document.getElementById(replyTo.id);
                         if (originalMessage) {
                             originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            originalMessage.classList.add('bg-cyan-800'); // رنگ هایلایت
+                            originalMessage.classList.add('bg-cyan-800');
                             originalMessage.style.transition = 'background-color 300ms';
                             setTimeout(() => {
                                 originalMessage.classList.remove('bg-cyan-800');
-                            }, 1500); // بازگشت به رنگ اصلی بعد از ۱.۵ ثانیه
+                            }, 1500);
                         }
                     };
                     msgDiv.insertBefore(replyBox, msgDiv.firstChild);
                 }
                 
+                // --- قراردادن پیام در صفحه چت ---
                 wrapper.className = 'flex w-full ' + (isMe ? 'justify-end' : 'justify-start');
                 wrapper.appendChild(msgDiv);
-                
-                // دکمه ریپلای را به wrapper اضافه می‌کنیم تا خارج از کادر پیام قرار گیرد
-                const buttonContainer = document.createElement('div');
-                buttonContainer.className = `relative w-8 flex-shrink-0 ${isMe ? 'order-first' : ''}`;
-                buttonContainer.appendChild(replyButton);
-                
-                // کانتینر دکمه و پیام را به ردیف اصلی اضافه می‌کنیم
-                const chatRow = document.createElement('div');
-                chatRow.className = 'flex items-center w-full ' + (isMe ? 'justify-end' : 'justify-start');
-                if (isMe) {
-                    chatRow.appendChild(wrapper);
-                    chatRow.appendChild(buttonContainer);
-                } else {
-                    chatRow.appendChild(buttonContainer);
-                    chatRow.appendChild(wrapper);
-                }
-
-                chatMessages.appendChild(chatRow);
+                chatMessages.appendChild(wrapper);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
     
