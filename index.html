@@ -328,9 +328,16 @@
     
                 ws.onopen = () => {
                     ws.send(JSON.stringify({ type: 'register', id: myId }));
-                    if (!partnerId) updateStatus(`آماده`, 'success');
-                    else updateStatus(`اتصال با سرور مجددا برقرار شد`, 'success');
-                    reconnectAttempts = 0; 
+                    reconnectAttempts = 0;
+
+                    // اگر قبل از قطعی به کسی متصل بودیم
+                    if (partnerId) {
+                        updateStatus(`اتصال با سرور برقرار شد، در تلاش برای اتصال مجدد به ${partnerId}...`, 'connecting');
+                        // یک درخواست اتصال مجدد آرام ارسال می‌کنیم
+                        sendDataTo(partnerId, { type: 'reconnect_request' });
+                    } else {
+                        updateStatus(`آماده`, 'success');
+                    }
                 };
     
                 ws.onmessage = (event) => {
@@ -475,6 +482,33 @@
                     startHeartbeat();
                     updateChatUIState(true);
                     broadcastData({ type: 'request_source' });
+                    return;
+                }
+
+                if (data.type === 'reconnect_request') {
+                    // اگر از طرف مقابل درخواست اتصال مجدد دریافت کردیم، وضعیت را به‌روز می‌کنیم
+                    // و heartbeat را مجددا راه‌اندازی می‌کنیم.
+                    if (fromId === partnerId) {
+                        updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                        updateChatUIState(true); // چت را فعال می‌کنیم
+                        if (!heartbeatInterval) { // فقط اگر heartbeat متوقف شده بود، دوباره شروع کن
+                            startHeartbeat();
+                        }
+                        // به طرف مقابل هم اطلاع می‌دهیم که اتصال برقرار است
+                        sendDataTo(fromId, { type: 'reconnect_confirm' });
+                    }
+                    return;
+                }
+
+                if (data.type === 'reconnect_confirm') {
+                    // اگر تأییدیه اتصال مجدد را دریافت کردیم
+                    if (fromId === partnerId) {
+                        updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                        updateChatUIState(true); // چت را فعال می‌کنیم
+                        if (!heartbeatInterval) { // فقط اگر heartbeat متوقف شده بود، دوباره شروع کن
+                            startHeartbeat();
+                        }
+                    }
                     return;
                 }
 
