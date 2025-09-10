@@ -62,13 +62,6 @@
         body {
             font-family: 'Vazirmatn', sans-serif;
         }
-        @keyframes highlight {
-            0% { background-color: rgba(6, 182, 212, 0.6); }
-            100% { background-color: transparent; }
-        }
-        .highlight-message {
-            animation: highlight 2s ease-in-out;
-        }
         video::-webkit-media-controls-timeline {
             background-color: rgba(0, 123, 255, 0.5);
             border-radius: 4px;
@@ -136,14 +129,6 @@
         <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
             <div class="mb-2 font-bold text-cyan-400">&#128172; چت</div>
             <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
-
-            <div id="reply-preview-container" class="bg-gray-700 p-2 rounded-t-md text-sm w-full -mb-2" style="display: none;">
-                <div class="flex justify-between items-center">
-                    <span class="text-cyan-400 text-xs">در حال پاسخ به:</span>
-                    <button id="cancel-reply-btn" class="text-red-400 hover:text-red-600 font-bold text-lg leading-none">&times;</button>
-                </div>
-                <div id="reply-preview-text" class="bg-gray-800 p-1.5 rounded mt-1 text-gray-300 italic truncate text-xs"></div>
-            </div>
             <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none;"></textarea>
                 <button id="chat-send" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-1 rounded-md">ارسال</button>
@@ -236,9 +221,6 @@
             const videoUrlInput = document.getElementById('video-url-input');
             const loadUrlBtn = document.getElementById('load-url-btn');
             const youtubePlayerContainer = document.getElementById('youtube-player-container');
-            const replyPreviewContainer = document.getElementById('reply-preview-container');
-            const replyPreviewText = document.getElementById('reply-preview-text');
-            const cancelReplyBtn = document.getElementById('cancel-reply-btn');
 
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -255,7 +237,6 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
-            let currentlyReplyingTo = null;
 
             myIdSpan.textContent = myId;
 
@@ -569,43 +550,14 @@
                 }
             }
     
-            function appendChatMessage(messageData, isMe) {
-                const messageId = messageData.id || `msg-${Date.now()}-${Math.random()}`;
-                
-                const wrapper = document.createElement('div');
-                wrapper.id = messageId;
-                wrapper.className = 'flex w-full group relative ' + (isMe ? 'justify-end' : 'justify-start');
-
+            function appendChatMessage(text, isMe) {
                 const div = document.createElement('div');
-                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
+                div.textContent = text;
                 div.style.direction = 'rtl';
-
-                if (messageData.replyTo && messageData.replyTo.id) {
-                    const replySnippet = document.createElement('a');
-                    replySnippet.href = `#${messageData.replyTo.id}`;
-                    replySnippet.className = 'block bg-black/20 p-2 rounded-md mb-2 text-xs italic opacity-80 hover:opacity-100 transition-opacity cursor-pointer';
-                    replySnippet.textContent = messageData.replyTo.text;
-                    replySnippet.setAttribute('data-scroll-to-id', messageData.replyTo.id);
-                    div.appendChild(replySnippet);
-                }
-
-                const textNode = document.createElement('span');
-                textNode.textContent = messageData.text;
-                div.appendChild(textNode);
-
-                const replyBtn = document.createElement('button');
-                replyBtn.innerHTML = `↩️`;
-                replyBtn.title = "پاسخ";
-                replyBtn.className = 'absolute -top-2.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-600 hover:bg-gray-500 rounded-full px-2 py-0 text-xs ' + (isMe ? 'left-0' : 'right-0');
-                replyBtn.onclick = () => {
-                    currentlyReplyingTo = { id: messageId, text: messageData.text };
-                    replyPreviewText.textContent = messageData.text;
-                    replyPreviewContainer.style.display = 'block';
-                    chatInput.focus();
-                };
-                
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex w-full ' + (isMe ? 'justify-end' : 'justify-start');
+                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
                 wrapper.appendChild(div);
-                wrapper.appendChild(replyBtn); 
                 chatMessages.appendChild(wrapper);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -613,20 +565,9 @@
             function sendChatMessage() {
                 const msg = chatInput.value.trim();
                 if (!msg) return;
-
-                const messageData = {
-                    id: `msg-${Date.now()}-${Math.random()}`,
-                    text: msg,
-                    replyTo: currentlyReplyingTo
-                };
-                
-                appendChatMessage(messageData, true);
-                broadcastData({ type: 'chat', message: messageData });
+                appendChatMessage(msg, true);
+                broadcastData({ type: 'chat', message: msg });
                 chatInput.value = '';
-
-                currentlyReplyingTo = null;
-                replyPreviewContainer.style.display = 'none';
-                chatInput.style.height = 'auto'; // (Optional) If you have auto-resize
             }
             
             // --- تابع یکپارچه ارسال وضعیت ---
@@ -802,29 +743,7 @@
                     sendChatMessage();
                 }
             });
-            cancelReplyBtn.addEventListener('click', () => {
-                currentlyReplyingTo = null;
-                replyPreviewContainer.style.display = 'none';
-            });
-
-            chatMessages.addEventListener('click', (e) => {
-                const replyLink = e.target.closest('a[data-scroll-to-id]');
-                if (replyLink) {
-                    e.preventDefault();
-                    const targetId = replyLink.getAttribute('data-scroll-to-id');
-                    const targetMessage = document.getElementById(targetId);
-                    if (targetMessage) {
-                        targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const targetBubble = targetMessage.querySelector('div');
-                        if (targetBubble) {
-                             targetBubble.classList.add('highlight-message');
-                             setTimeout(() => {
-                                 targetBubble.classList.remove('highlight-message');
-                             }, 2000);
-                        }
-                    }
-                }
-            });
+            
             updateChatUIState(false);
             connectWebSocket();
         });
