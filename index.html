@@ -610,8 +610,7 @@
     
             function appendChatMessage(data, isMe) {
                 const { message, messageId, replyTo } = data;
-                msgDiv.style.direction = 'rtl';
-                msgDiv.style.textAlign = 'right';
+                
                 // ۱. ساخت ردیف اصلی به عنوان یک کانتینر Flex
                 const chatRow = document.createElement('div');
                 chatRow.className = `group flex items-center gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`;
