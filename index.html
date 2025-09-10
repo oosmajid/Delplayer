@@ -237,6 +237,9 @@
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
+            let replyingTo = null; // آبجکتی برای نگهداری اطلاعات پیام در حال ریپلای
+            const replyPreviewContainer = document.createElement('div');
+
 
             myIdSpan.textContent = myId;
 
@@ -543,7 +546,7 @@
                 }
 
                 if (data.type === 'chat') {
-                    appendChatMessage(data.message, false);
+                    appendChatMessage(data.data, false); // ارسال کل آبجکت data.data
                     playNotificationSound();
                     return;
                 }
@@ -584,14 +587,51 @@
                 }
             }
     
-            function appendChatMessage(text, isMe) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                div.style.direction = 'rtl';
+            function appendChatMessage(data, isMe) {
+                const { message, messageId, replyTo } = data; // دریافت اطلاعات کامل پیام
+                
                 const wrapper = document.createElement('div');
+                const msgDiv = document.createElement('div');
+                const replyButton = document.createElement('button');
+
+                // ساخت آیکون ریپلای با SVG
+                replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 group-hover:opacity-100"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
+                replyButton.className = 'absolute top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-600 transition-all group';
+                replyButton.style[isMe ? 'right' : 'left'] = '-30px'; // قرارگیری دکمه در کنار پیام
+                replyButton.onclick = () => {
+                    replyingTo = { id: messageId, text: message };
+                    updateReplyPreview();
+                    chatInput.focus();
+                };
+
+                // ساخت پیام اصلی
+                msgDiv.textContent = message;
+                msgDiv.style.direction = 'rtl';
+                msgDiv.className = `relative px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
+                msgDiv.id = messageId; // تخصیص ID به پیام
+                msgDiv.appendChild(replyButton);
+                
+                // اگر پیام یک ریپلای بود، باکس ریپلای را اضافه کن
+                if (replyTo) {
+                    const replyBox = document.createElement('div');
+                    replyBox.className = 'bg-black bg-opacity-20 p-2 rounded-md mb-2 border-l-2 border-cyan-400 cursor-pointer hover:bg-opacity-30';
+                    replyBox.textContent = replyTo.text.substring(0, 30) + (replyTo.text.length > 30 ? '...' : '');
+                    replyBox.onclick = () => {
+                        const originalMessage = document.getElementById(replyTo.id);
+                        if (originalMessage) {
+                            originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            originalMessage.classList.add('bg-cyan-800'); // رنگ هایلایت
+                            originalMessage.style.transition = 'background-color 300ms';
+                            setTimeout(() => {
+                                originalMessage.classList.remove('bg-cyan-800');
+                            }, 1500); // بازگشت به رنگ اصلی بعد از ۱.۵ ثانیه
+                        }
+                    };
+                    msgDiv.insertBefore(replyBox, msgDiv.firstChild);
+                }
+                
                 wrapper.className = 'flex w-full ' + (isMe ? 'justify-end' : 'justify-start');
-                div.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
-                wrapper.appendChild(div);
+                wrapper.appendChild(msgDiv);
                 chatMessages.appendChild(wrapper);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -599,9 +639,19 @@
             function sendChatMessage() {
                 const msg = chatInput.value.trim();
                 if (!msg) return;
-                appendChatMessage(msg, true);
-                broadcastData({ type: 'chat', message: msg });
+
+                const messageData = {
+                    message: msg,
+                    messageId: 'msg_' + Date.now() + '_' + myId, // ساخت یک ID منحصر به فرد
+                    replyTo: replyingTo // افزودن اطلاعات ریپلای
+                };
+                
+                appendChatMessage(messageData, true);
+                broadcastData({ type: 'chat', data: messageData }); // ارسال آبجکت کامل
+                
                 chatInput.value = '';
+                replyingTo = null; // ریست کردن وضعیت ریپلای
+                updateReplyPreview(); // مخفی کردن پیش‌نمایش
             }
             
             // --- تابع یکپارچه ارسال وضعیت ---
@@ -777,6 +827,29 @@
                     sendChatMessage();
                 }
             });
+
+            // --- تنظیمات اولیه پیش‌نمایش ریپلای ---
+            replyPreviewContainer.className = 'bg-gray-700 p-2 rounded-t-lg text-sm text-gray-400 hidden items-center justify-between';
+            chatInput.parentElement.parentElement.insertBefore(replyPreviewContainer, chatInput.parentElement);
+
+            function updateReplyPreview() {
+                if (replyingTo) {
+                    replyPreviewContainer.innerHTML = `
+                        <span>در پاسخ به: <em class="text-cyan-400">${replyingTo.text.substring(0, 30)}...</em></span>
+                        <button id="cancel-reply" class="font-bold text-red-500 text-lg">&times;</button>
+                    `;
+                    replyPreviewContainer.classList.remove('hidden');
+                    replyPreviewContainer.classList.add('flex');
+                    document.getElementById('cancel-reply').onclick = () => {
+                        replyingTo = null;
+                        updateReplyPreview();
+                    };
+                } else {
+                    replyPreviewContainer.classList.add('hidden');
+                    replyPreviewContainer.classList.remove('flex');
+                    replyPreviewContainer.innerHTML = '';
+                }
+            }
             
             updateChatUIState(false);
             connectWebSocket();
