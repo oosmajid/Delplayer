@@ -128,9 +128,9 @@
         </div>
         <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
             <div class="mb-2 font-bold text-cyan-400">&#128172; چت</div>
-            <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
+            <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: rtl; text-align: right;"></div>
             <div class="flex gap-2 flex-wrap sm:flex-nowrap">
-                <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none;"></textarea>
+                <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none; direction: rtl; text-align: right;"></textarea>
                 <button id="chat-send" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-1 rounded-md">ارسال</button>
             </div>
         </div>
@@ -619,6 +619,9 @@
                 const msgDiv = document.createElement('div');
                 msgDiv.id = messageId;
                 msgDiv.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
+                
+                msgDiv.style.direction = 'rtl';
+                msgDiv.style.textAlign = 'right';
                 
                 // اگر پیام یک ریپلای بود، باکس مربوطه را اضافه کن
                 if (replyTo) {
