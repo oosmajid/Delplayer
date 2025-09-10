@@ -619,10 +619,7 @@
                 const msgDiv = document.createElement('div');
                 msgDiv.id = messageId;
                 msgDiv.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
-                
-                msgDiv.style.direction = 'rtl';
-                msgDiv.style.textAlign = 'right';
-                
+
                 // اگر پیام یک ریپلای بود، باکس مربوطه را اضافه کن
                 if (replyTo) {
                     const replyBox = document.createElement('div');
