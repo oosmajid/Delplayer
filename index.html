@@ -591,7 +591,6 @@
                 const { message, messageId, replyTo } = data;
 
                 // ۱. ساخت ردیف اصلی به عنوان یک کانتینر Flex
-                // کلاس 'group' در اینجا باعث می‌شود با هاور روی کل ردیف، دکمه ظاهر شود
                 const chatRow = document.createElement('div');
                 chatRow.className = `group flex items-center gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`;
 
@@ -627,7 +626,6 @@
                 // ۳. ساخت دکمه ریپلای
                 const replyButton = document.createElement('button');
                 replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 hover:text-gray-200"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
-                // دکمه به صورت پیش‌فرض نامرئی است و با هاور روی ردیف (group) ظاهر می‌شود
                 replyButton.className = 'transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100';
                 replyButton.onclick = () => {
                     replyingTo = { id: messageId, text: message };
@@ -635,17 +633,15 @@
                     chatInput.focus();
                 };
 
-                // ۴. چیدمان نهایی ردیف بر اساس فرستنده پیام
+                // --- ۴. چیدمان نهایی ردیف (تغییر در این قسمت) ---
                 if (isMe) {
-                    // برای پیام‌های من: [حباب پیام] [دکمه]
-                    // کلاس order-last باعث می‌شود دکمه بعد از پیام قرار گیرد
-                    replyButton.classList.add('order-last'); 
-                    chatRow.appendChild(msgDiv);
+                    // برای پیام‌های من: [دکمه] [حباب پیام]
                     chatRow.appendChild(replyButton);
+                    chatRow.appendChild(msgDiv);
                 } else {
-                    // برای پیام‌های طرف مقابل: [دکمه] [حباب پیام]
-                    chatRow.appendChild(replyButton);
+                    // برای پیام‌های طرف مقابل: [حباب پیام] [دکمه]
                     chatRow.appendChild(msgDiv);
+                    chatRow.appendChild(replyButton);
                 }
 
                 // ۵. افزودن ردیف کامل به صفحه چت
