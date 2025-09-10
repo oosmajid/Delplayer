@@ -610,7 +610,7 @@
     
             function appendChatMessage(data, isMe) {
                 const { message, messageId, replyTo } = data;
-                
+
                 // ۱. ساخت ردیف اصلی به عنوان یک کانتینر Flex
                 const chatRow = document.createElement('div');
                 chatRow.className = `group flex items-center gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`;
@@ -619,6 +619,9 @@
                 const msgDiv = document.createElement('div');
                 msgDiv.id = messageId;
                 msgDiv.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
+
+                msgDiv.style.direction = 'rtl';
+                msgDiv.style.textAlign = 'right';
 
                 // اگر پیام یک ریپلای بود، باکس مربوطه را اضافه کن
                 if (replyTo) {
