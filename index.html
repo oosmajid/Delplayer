@@ -408,9 +408,13 @@
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
                 lastPongReceivedTime = Date.now();
                 
+                const PING_INTERVAL = 5000; 
+                const TIMEOUT = 8000;
+
                 heartbeatInterval = setInterval(() => {
                     if (!partnerId) {
                         clearInterval(heartbeatInterval);
+                        heartbeatInterval = null;
                         return;
                     }
 
@@ -421,12 +425,12 @@
                         videoPlayer.pause();
                         if (isYouTubeMode && ytPlayer) ytPlayer.pauseVideo();
                         if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
-                        clearInterval(heartbeatInterval);
-                        heartbeatInterval = null; 
-                        return;
+                        // clearInterval(heartbeatInterval);
+                        // heartbeatInterval = null; 
+                        // return;
                     }
                     sendDataTo(partnerId, { type: 'ping' });
-                }, 5000);
+                }, PING_INTERVAL);
             }
 
             function playNotificationSound() {
@@ -460,7 +464,17 @@
                 }
 
                 if (data.type === 'ping') { sendDataTo(fromId, { type: 'pong' }); return; }
-                if (data.type === 'pong' && fromId === partnerId) { lastPongReceivedTime = Date.now(); return; }
+                if (data.type === 'pong' && fromId === partnerId) {
+                    lastPongReceivedTime = Date.now();
+                    
+                    // اگر وضعیت "ناپایدار" بود، آن را به "متصل" تغییر بده
+                    if (statusDiv.textContent.includes('ناپایدار')) {
+                        updateStatus(`اتصال با ${fromId} برقرار شد`, 'connected');
+                    }
+                    updateChatUIState(true);
+                    
+                    return;
+                }
 
                 if (data.type === 'connect_request') {
                     partnerId = fromId;
