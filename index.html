@@ -414,7 +414,7 @@
                         return;
                     }
 
-                    if (Date.now() - lastPongReceivedTime > 15000) {
+                    if (Date.now() - lastPongReceivedTime > 8000) {
                         console.error("Heartbeat failed. Peer seems disconnected.");
                         updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
                         updateChatUIState(false);
@@ -591,35 +591,16 @@
                 const { message, messageId, replyTo } = data;
 
                 // ۱. ساخت ردیف اصلی به عنوان یک کانتینر Flex
-                // کلاس group در اینجا باعث می‌شود با هاور روی کل ردیف، دکمه ظاهر شود
+                // کلاس 'group' در اینجا باعث می‌شود با هاور روی کل ردیف، دکمه ظاهر شود
                 const chatRow = document.createElement('div');
                 chatRow.className = `group flex items-center gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`;
 
-                const wrapper = document.createElement('div'); // این wrapper برای هم‌ترازی خود حباب پیام است
+                // ۲. ساخت خود حباب پیام
                 const msgDiv = document.createElement('div');
-                const replyButton = document.createElement('button');
-
-                // ۲. استایل‌دهی دکمه ریپلای
-                replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
-                // دکمه دیگر absolute نیست و یک آیتم flex است. با هاور روی chatRow (که group است) ظاهر می‌شود.
-                replyButton.className = 'transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100';
-                replyButton.onclick = () => {
-                    replyingTo = { id: messageId, text: message };
-                    updateReplyPreview();
-                    chatInput.focus();
-                };
-
-                // ۳. استایل‌دهی حباب پیام
-                // دیگر به کلاس‌های relative و group در اینجا نیازی نیست
-                msgDiv.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
                 msgDiv.id = messageId;
+                msgDiv.className = `px-3 py-2 mb-1 max-w-[80%] break-words shadow rounded-xl ${isMe ? 'bg-cyan-600 text-white rounded-br-lg' : 'bg-gray-700 text-white rounded-bl-lg'}`;
                 
-                // دیگر به padding اضافی برای متن نیازی نیست چون دکمه خارج از حباب است
-                const textSpan = document.createElement('span');
-                textSpan.textContent = message;
-                msgDiv.appendChild(textSpan);
-
-                // باکس ریپلای (بدون تغییر)
+                // اگر پیام یک ریپلای بود، باکس مربوطه را اضافه کن
                 if (replyTo) {
                     const replyBox = document.createElement('div');
                     replyBox.className = 'bg-black bg-opacity-20 p-2 rounded-md mb-2 border-l-2 border-cyan-400 cursor-pointer hover:bg-opacity-30';
@@ -638,17 +619,33 @@
                     msgDiv.insertBefore(replyBox, msgDiv.firstChild);
                 }
                 
-                wrapper.appendChild(msgDiv);
+                // افزودن متن اصلی پیام
+                const textSpan = document.createElement('span');
+                textSpan.textContent = message;
+                msgDiv.appendChild(textSpan);
+
+                // ۳. ساخت دکمه ریپلای
+                const replyButton = document.createElement('button');
+                replyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 hover:text-gray-200"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>`;
+                // دکمه به صورت پیش‌فرض نامرئی است و با هاور روی ردیف (group) ظاهر می‌شود
+                replyButton.className = 'transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100';
+                replyButton.onclick = () => {
+                    replyingTo = { id: messageId, text: message };
+                    updateReplyPreview();
+                    chatInput.focus();
+                };
 
                 // ۴. چیدمان نهایی ردیف بر اساس فرستنده پیام
                 if (isMe) {
                     // برای پیام‌های من: [حباب پیام] [دکمه]
-                    chatRow.appendChild(wrapper);
+                    // کلاس order-last باعث می‌شود دکمه بعد از پیام قرار گیرد
+                    replyButton.classList.add('order-last'); 
+                    chatRow.appendChild(msgDiv);
                     chatRow.appendChild(replyButton);
                 } else {
                     // برای پیام‌های طرف مقابل: [دکمه] [حباب پیام]
                     chatRow.appendChild(replyButton);
-                    chatRow.appendChild(wrapper);
+                    chatRow.appendChild(msgDiv);
                 }
 
                 // ۵. افزودن ردیف کامل به صفحه چت
