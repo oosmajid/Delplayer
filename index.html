@@ -450,40 +450,34 @@
                     }
                 }
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-                
+
+                // تعریف نت‌های ملودی (یک آکورد شکسته ساده و دلنشین)
+                const notes = [1046.50, 1318.51, 1567.98]; // C6, E6, G6
                 const now = audioCtx.currentTime;
-                
-                // --- صدای اصلی (نت بالاتر) ---
-                const oscillator1 = audioCtx.createOscillator();
-                const gainNode1 = audioCtx.createGain();
-                oscillator1.connect(gainNode1);
-                gainNode1.connect(audioCtx.destination);
-                
-                // --- صدای مکمل (نت پایین‌تر برای ایجاد هارمونی) ---
-                const oscillator2 = audioCtx.createOscillator();
-                const gainNode2 = audioCtx.createGain();
-                oscillator2.connect(gainNode2);
-                gainNode2.connect(audioCtx.destination);
+                const attackTime = 0.01; // زمان اوج گرفتن صدا (برای نرمی شروع)
+                const releaseTime = 0.15; // زمان محو شدن هر نت
+                const gainValue = 0.1; // ولوم کلی پایین‌تر برای لطافت بیشتر
 
-                // --- تنظیمات صدای اصلی ---
-                oscillator1.type = 'triangle';
-                oscillator1.frequency.setValueAtTime(1480, now); // فرکانس نت اصلی
-                gainNode1.gain.setValueAtTime(0.2, now); // ولوم اصلی
+                notes.forEach((frequency, index) => {
+                    const startTime = now + index * 0.1; // هر نت با کمی تاخیر پخش می‌شود
 
-                // --- تنظیمات صدای مکمل ---
-                oscillator2.type = 'triangle';
-                oscillator2.frequency.setValueAtTime(1975.53, now); // فرکانس نت مکمل
-                gainNode2.gain.setValueAtTime(0.1, now); // ولوم کمتر برای مکمل بودن
-
-                // --- ایجاد افکت محو شدن سریع برای هر دو صدا ---
-                gainNode1.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
-                gainNode2.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
-
-                // --- پخش و توقف همزمان ---
-                oscillator1.start(now);
-                oscillator2.start(now);
-                oscillator1.stop(now + 0.4);
-                oscillator2.stop(now + 0.4);
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    oscillator.type = 'sine'; // موج سینوسی خالص‌ترین و نرم‌ترین صدا را دارد
+                    oscillator.frequency.setValueAtTime(frequency, startTime);
+                    
+                    // ایجاد افکت حمله و رها شدن نرم برای هر نت
+                    gainNode.gain.setValueAtTime(0, startTime);
+                    gainNode.gain.linearRampToValueAtTime(gainValue, startTime + attackTime);
+                    gainNode.gain.linearRampToValueAtTime(0, startTime + releaseTime);
+                    
+                    oscillator.start(startTime);
+                    oscillator.stop(startTime + releaseTime);
+                });
             }
     
             function handleReceivedData(data, fromId) {
