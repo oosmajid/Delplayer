@@ -631,7 +631,7 @@
                     replyBox.onclick = () => {
                         const originalMessage = document.getElementById(replyTo.id);
                         if (originalMessage) {
-                            originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            chatMessages.scrollTo({ top: originalMessage.offsetTop - chatMessages.offsetTop, behavior: 'smooth' });
                             originalMessage.classList.add('bg-cyan-800');
                             originalMessage.style.transition = 'background-color 300ms';
                             setTimeout(() => {
