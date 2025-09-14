@@ -452,22 +452,38 @@
                 if (audioCtx.state === 'suspended') audioCtx.resume();
                 
                 const now = audioCtx.currentTime;
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
+                
+                // --- صدای اصلی (نت بالاتر) ---
+                const oscillator1 = audioCtx.createOscillator();
+                const gainNode1 = audioCtx.createGain();
+                oscillator1.connect(gainNode1);
+                gainNode1.connect(audioCtx.destination);
+                
+                // --- صدای مکمل (نت پایین‌تر برای ایجاد هارمونی) ---
+                const oscillator2 = audioCtx.createOscillator();
+                const gainNode2 = audioCtx.createGain();
+                oscillator2.connect(gainNode2);
+                gainNode2.connect(audioCtx.destination);
 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
+                // --- تنظیمات صدای اصلی ---
+                oscillator1.type = 'triangle';
+                oscillator1.frequency.setValueAtTime(1480, now); // فرکانس نت اصلی
+                gainNode1.gain.setValueAtTime(0.2, now); // ولوم اصلی
 
-                // پارامترهای صدای جدید "دینگ"
-                oscillator.type = 'triangle'; // استفاده از یک موج نرم‌تر
-                oscillator.frequency.setValueAtTime(1046.50, now); // فرکانس بالاتر و دلنشین‌تر (نت C6)
-                gainNode.gain.setValueAtTime(0.3, now); // شروع با ولوم کمی بالاتر
+                // --- تنظیمات صدای مکمل ---
+                oscillator2.type = 'triangle';
+                oscillator2.frequency.setValueAtTime(1975.53, now); // فرکانس نت مکمل
+                gainNode2.gain.setValueAtTime(0.1, now); // ولوم کمتر برای مکمل بودن
 
-                // ایجاد افکت محو شدن صدا (مهم‌ترین بخش)
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); // صدا در نیم ثانیه محو می‌شود
+                // --- ایجاد افکت محو شدن سریع برای هر دو صدا ---
+                gainNode1.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+                gainNode2.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
 
-                oscillator.start(now);
-                oscillator.stop(now + 0.5);
+                // --- پخش و توقف همزمان ---
+                oscillator1.start(now);
+                oscillator2.start(now);
+                oscillator1.stop(now + 0.4);
+                oscillator2.stop(now + 0.4);
             }
     
             function handleReceivedData(data, fromId) {
