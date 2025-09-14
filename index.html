@@ -450,16 +450,24 @@
                     }
                 }
                 if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                const now = audioCtx.currentTime;
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
+
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-                gainNode.gain.value = 0.1; 
-                oscillator.frequency.value = 880; 
-                oscillator.type = 'sine';
-                const now = audioCtx.currentTime;
+
+                // پارامترهای صدای جدید "دینگ"
+                oscillator.type = 'triangle'; // استفاده از یک موج نرم‌تر
+                oscillator.frequency.setValueAtTime(1046.50, now); // فرکانس بالاتر و دلنشین‌تر (نت C6)
+                gainNode.gain.setValueAtTime(0.3, now); // شروع با ولوم کمی بالاتر
+
+                // ایجاد افکت محو شدن صدا (مهم‌ترین بخش)
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); // صدا در نیم ثانیه محو می‌شود
+
                 oscillator.start(now);
-                oscillator.stop(now + 0.2);
+                oscillator.stop(now + 0.5);
             }
     
             function handleReceivedData(data, fromId) {
