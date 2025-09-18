@@ -8,24 +8,13 @@
     <title>دل‌پلیر</title>
     <meta name="description" content="با دل‌پلیر به راحتی و به صورت همزمان با دوست یا پارتنر خود فیلم و سریال تماشا کنید. فقط کافیست لینک یا فایل ویدیو را وارد کرده و با شناسه مخصوص به هم متصل شوید.">
     <meta name="keywords" content="تماشای همزمان فیلم, دیدن فیلم با دوستان, پخش همزمان ویدیو, تماشای همزمان یوتیوب, سینما آنلاین, دل پلیر, delplayer">
-    <link rel="canonical" href="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
-    <meta property="og:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
+    <link rel="canonical" href="https://delplayer.ir"> <meta property="og:type" content="website">
+    <meta property="og:url" content="https://delplayer.ir"> <meta property="og:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
     <meta property="og:description" content="با دل‌پلیر به راحتی و به صورت همزمان با پارتنر خود از راه دور فیلم و سریال تماشا کنید.">
-    <meta property="og:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <!--! می‌توانید آدرس یک تصویر مناسب برای اشتراک‌گذاری قرار دهید -->
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://delplayer.ir"> <!--! آدرس اصلی سایت خود را اینجا وارد کنید -->
-    <meta property="twitter:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
+    <meta property="og:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://delplayer.ir"> <meta property="twitter:title" content="دل‌پلیر: با پارتنرت از راه دور همزمان فیلم ببین">
     <meta property="twitter:description" content="با دل‌پلیر به راحتی و به صورت همزمان با پارتنر خود از راه دور فیلم و سریال تماشا کنید.">
-    <meta property="twitter:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <!--! می‌توانید آدرس یک تصویر مناسب برای اشتراک‌گذاری قرار دهید -->
-
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
+    <meta property="twitter:image" content="https://placehold.co/1200x630/0D1117/7DF9FF?text=Delplayer"> <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
@@ -72,6 +61,13 @@
             color: #fff;
             text-shadow: 1px 1px 2px black;
         }
+        /* Style for the emoji picker */
+        emoji-picker {
+            position: absolute;
+            bottom: 100px;
+            right: 20px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
@@ -102,7 +98,6 @@
             </div>
         </div>
         
-        <!-- Video Players -->
         <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
         <div id="youtube-player-container" class="w-full rounded-lg bg-black aspect-video" style="display: none;">
             <div id="youtube-player"></div>
@@ -126,13 +121,15 @@
                 <button id="disconnect-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors hidden">قطع اتصال</button>
             </div>
         </div>
-        <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full">
+        <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full relative">
             <div class="mb-2 font-bold text-cyan-400">&#128172; چت</div>
             <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
             <div class="flex gap-2 flex-wrap sm:flex-nowrap">
                 <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none; direction: rtl; text-align: right;"></textarea>
+                <button id="emoji-btn" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-md">😊</button>
                 <button id="chat-send" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-1 rounded-md">ارسال</button>
             </div>
+             <emoji-picker class="light" style="display:none;"></emoji-picker>
         </div>
     </div>
     <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6 mt-8">
@@ -183,8 +180,10 @@
         </p>
     </footer>
 
-    <!-- YouTube IFrame API -->
     <script src="https://www.youtube.com/iframe_api"></script>
+    
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+
 
     <script>
         // --- YouTube Player Globals ---
@@ -221,6 +220,8 @@
             const videoUrlInput = document.getElementById('video-url-input');
             const loadUrlBtn = document.getElementById('load-url-btn');
             const youtubePlayerContainer = document.getElementById('youtube-player-container');
+            const emojiBtn = document.getElementById('emoji-btn');
+            const emojiPicker = document.querySelector('emoji-picker');
 
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -242,6 +243,16 @@
 
 
             myIdSpan.textContent = myId;
+
+            // --- Emoji Picker Logic ---
+            emojiBtn.addEventListener('click', () => {
+                emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            emojiPicker.addEventListener('emoji-click', event => {
+                chatInput.value += event.detail.unicode;
+                emojiPicker.style.display = 'none';
+            });
 
             // --- توابع مدیریت یوتیوب ---
 
