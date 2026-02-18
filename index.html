@@ -61,6 +61,11 @@
             color: #fff;
             text-shadow: 1px 1px 2px black;
         }
+        #my-video:not([src]),
+        #my-video[src=""] {
+            aspect-ratio: 16 / 9;
+            min-height: 180px;
+        }
         /* Style for the emoji picker */
         emoji-picker {
             position: absolute;
@@ -68,10 +73,31 @@
             left: 10px;
             z-index: 100;
         }
+        #media-chat-layout.chat-side-by-side {
+            gap: 1rem;
+        }
+        @media (min-width: 1024px) {
+            #media-chat-layout.chat-side-by-side {
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+            }
+            #media-chat-layout.chat-side-by-side #player-panel {
+                flex: 1 1 0%;
+                min-width: 0;
+            }
+            #media-chat-layout.chat-side-by-side #chat-panel {
+                flex: 0 0 360px;
+                max-width: 360px;
+            }
+            #media-chat-layout.chat-side-by-side #chat-messages {
+                height: 18rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
+    <div class="w-full max-w-6xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6">
         <div class="text-center">
             <h1 class="text-3xl font-bold text-cyan-400">🎬 دل‌پلیر: تماشای فیلم با هم</h1>
             <p class="text-gray-400 mt-2">لینک ویدیو (مستقیم یا یوتیوب) را وارد کنید یا فایل آن را انتخاب کنید. سپس شناسه خود را به دوستتان بدهید یا شناسه او را وارد کنید.</p>
@@ -98,16 +124,6 @@
             </div>
         </div>
         
-        <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
-        <div id="youtube-player-container" class="w-full rounded-lg bg-black aspect-video" style="display: none;">
-            <div id="youtube-player"></div>
-        </div>
-
-        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
-            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
-        </div>
-        <div id="length-warning" class="text-center font-bold text-red-500 mb-2" style="display:none"></div>
-
         <div class="bg-gray-900 p-4 rounded-lg space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
             <div class="text-center md:text-right">
                 <span class="text-gray-400">شناسه شما:</span>
@@ -121,18 +137,42 @@
                 <button id="disconnect-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors hidden">قطع اتصال</button>
             </div>
         </div>
-        <div class="bg-gray-900 p-4 rounded-lg mb-4 w-full relative">
-            <div class="mb-2 font-bold text-cyan-400">&#128172; چت</div>
-            <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
-            <div class="flex gap-2 flex-nowrap">
-                <button id="chat-send" class="w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-1 rounded-md">ارسال</button>
-                <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none; direction: rtl; text-align: right;"></textarea>
-                <button id="emoji-btn" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-md">😊</button>
+
+        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
+            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
+        </div>
+
+        <div id="media-chat-layout" class="flex flex-col gap-4">
+            <div id="player-panel" class="w-full space-y-2">
+                <video id="my-video" class="w-full rounded-lg bg-black" controls></video>
+                <div id="youtube-player-container" class="w-full rounded-lg bg-black aspect-video" style="display: none;">
+                    <div id="youtube-player"></div>
+                </div>
+                <div id="length-warning" class="text-center font-bold text-red-500" style="display:none"></div>
             </div>
-             <emoji-picker class="light" style="display:none;"></emoji-picker>
+
+            <div id="chat-panel" class="bg-gray-900 p-4 rounded-lg w-full">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <div class="font-bold text-cyan-400 text-right">&#128172; چت</div>
+                    <button id="chat-layout-toggle" type="button" class="p-2.5 bg-gray-800/95 hover:bg-gray-700 text-cyan-200 hover:text-white border border-gray-600 hover:border-cyan-400 rounded-lg shadow-sm hover:shadow-cyan-900/30 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/60" aria-label="بردن چت کنار پلیر" title="بردن چت کنار پلیر">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                            <line x1="15" y1="4" x2="15" y2="20"></line>
+                            <polyline points="10 9 8 12 10 15"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <div id="chat-messages" class="bg-gray-800 rounded p-2 h-32 overflow-y-auto text-sm mb-2" style="direction: ltr; text-align: left;"></div>
+                <div class="flex gap-2 flex-nowrap">
+                    <button id="chat-send" class="w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-6 py-1 rounded-md">ارسال</button>
+                    <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none; direction: rtl; text-align: right;"></textarea>
+                    <button id="emoji-btn" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-md">😊</button>
+                </div>
+                <emoji-picker class="light" style="display:none;"></emoji-picker>
+            </div>
         </div>
     </div>
-    <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6 mt-8">
+    <div class="w-full max-w-6xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-6 mt-8">
         <div class="text-center border-b border-gray-700 pb-4">
             <h2 class="text-2xl font-bold text-cyan-400">دل‌پلیر چگونه کار می‌کند؟</h2>
             <p class="text-gray-400 mt-2">تماشای فیلم با دوستتان در سه مرحله ساده!</p>
@@ -156,7 +196,7 @@
         </div>
     </div>
 
-    <div class="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-4 mt-8">
+    <div class="w-full max-w-6xl bg-gray-800 rounded-2xl shadow-lg p-6 space-y-4 mt-8">
         <div class="text-center border-b border-gray-700 pb-4">
             <h2 class="text-2xl font-bold text-cyan-400">ویژگی‌های کلیدی</h2>
         </div>
@@ -220,6 +260,8 @@
             const videoUrlInput = document.getElementById('video-url-input');
             const loadUrlBtn = document.getElementById('load-url-btn');
             const youtubePlayerContainer = document.getElementById('youtube-player-container');
+            const mediaChatLayout = document.getElementById('media-chat-layout');
+            const chatLayoutToggle = document.getElementById('chat-layout-toggle');
             const emojiBtn = document.getElementById('emoji-btn');
             const emojiPicker = document.querySelector('emoji-picker');
 
@@ -239,6 +281,7 @@
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
             let replyingTo = null; // آبجکتی برای نگهداری اطلاعات پیام در حال ریپلای
+            let isChatDocked = false;
             const replyPreviewContainer = document.createElement('div');
 
 
@@ -258,6 +301,21 @@
                     emojiPicker.style.display = 'none';
                 }
             });
+
+            function updateChatLayout() {
+                mediaChatLayout.classList.toggle('chat-side-by-side', isChatDocked);
+                const label = isChatDocked ? 'بازگرداندن چت به حالت زیر پلیر' : 'بردن چت کنار پلیر';
+                chatLayoutToggle.title = label;
+                chatLayoutToggle.setAttribute('aria-label', label);
+                chatLayoutToggle.setAttribute('aria-pressed', String(isChatDocked));
+            }
+
+            chatLayoutToggle.addEventListener('click', () => {
+                isChatDocked = !isChatDocked;
+                updateChatLayout();
+            });
+
+            updateChatLayout();
 
             // --- توابع مدیریت یوتیوب ---
 
