@@ -138,9 +138,6 @@
             </div>
         </div>
 
-        <div id="status" class="text-center font-semibold p-2 rounded-md transition-all">
-            <span class="bg-gray-700 text-yellow-400 px-4 py-1 rounded-full">منتظر اتصال</span>
-        </div>
 
         <div id="media-chat-layout" class="flex flex-col gap-4">
             <div id="player-panel" class="w-full space-y-2">
@@ -220,6 +217,11 @@
         </p>
     </footer>
 
+    <div id="status-tooltip" class="fixed bottom-20 right-4 sm:bottom-22 sm:right-6 z-50 bg-gray-600 text-white px-4 py-2 rounded-lg shadow-lg border border-gray-500/80 opacity-0 pointer-events-none transition-all duration-300 max-w-xs">
+        <div id="tooltip-content" class="text-sm font-medium"></div>
+        <div id="tooltip-arrow" class="absolute -bottom-2 right-6 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-gray-600"></div>
+    </div>
+
     <button id="status-fab" type="button" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-12 h-12 rounded-full bg-gray-600 text-white shadow-lg border border-gray-500/80 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/70" aria-label="وضعیت اتصال" title="مشاهده وضعیت اتصال">
         <span id="status-fab-icon" class="flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -263,9 +265,11 @@
             const partnerIdInput = document.getElementById('partner-id-input');
             const connectBtn = document.getElementById('connect-btn');
             const disconnectBtn = document.getElementById('disconnect-btn');
-            const statusDiv = document.getElementById('status');
             const statusFab = document.getElementById('status-fab');
             const statusFabIcon = document.getElementById('status-fab-icon');
+            const statusTooltip = document.getElementById('status-tooltip');
+            const tooltipContent = document.getElementById('tooltip-content');
+            const tooltipArrow = document.getElementById('tooltip-arrow');
             const chatMessages = document.getElementById('chat-messages');
             const chatInput = document.getElementById('chat-input');
             const chatSend = document.getElementById('chat-send');
@@ -443,31 +447,41 @@
                 }; 
                 const className = statusClasses[type] || 'bg-gray-700 text-yellow-400';
                 const animationClass = type === 'connecting' ? 'animate-pulse' : '';
-                statusDiv.innerHTML = `<span class="${className} ${animationClass} px-4 py-1 rounded-full">${message}</span>`;
                 updateStatusFab(type, message);
+                showTooltipTemporarily(message);
             }
 
             function updateStatusFab(type, message) {
                 const fabConfig = {
                     success: {
                         className: 'bg-green-600 border-green-500/80 text-white',
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+                        tooltipClass: 'bg-green-600 border-green-500/80',
+                        arrowClass: 'border-t-green-600'
                     },
                     connected: {
                         className: 'bg-green-600 border-green-500/80 text-white',
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+                        tooltipClass: 'bg-green-600 border-green-500/80',
+                        arrowClass: 'border-t-green-600'
                     },
                     connecting: {
                         className: 'bg-yellow-400 border-yellow-300/80 text-black',
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6z"></path></svg>`
+                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M12 3a9 9 0 0 1 9 9h-3a6 6 0 0 0-6-6z"></path></svg>`,
+                        tooltipClass: 'bg-yellow-400 border-yellow-300/80 text-black',
+                        arrowClass: 'border-t-yellow-400'
                     },
                     error: {
                         className: 'bg-red-600 border-red-500/80 text-white',
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
+                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+                        tooltipClass: 'bg-red-600 border-red-500/80',
+                        arrowClass: 'border-t-red-600'
                     },
                     disconnected: {
                         className: 'bg-gray-600 border-gray-500/80 text-white',
-                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5"></path><path d="M16 3v5"></path><path d="M12 12v9"></path><path d="M5 8h14"></path><path d="M3 3l18 18"></path></svg>`
+                        icon: `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5"></path><path d="M16 3v5"></path><path d="M12 12v9"></path><path d="M5 8h14"></path><path d="M3 3l18 18"></path></svg>`,
+                        tooltipClass: 'bg-gray-600 border-gray-500/80',
+                        arrowClass: 'border-t-gray-600'
                     }
                 };
 
@@ -476,10 +490,44 @@
                 statusFabIcon.innerHTML = config.icon;
                 statusFab.title = message || 'مشاهده وضعیت اتصال';
                 statusFab.setAttribute('aria-label', message ? `وضعیت: ${message}` : 'مشاهده وضعیت اتصال');
+                
+                // Update tooltip colors to match FAB
+                statusTooltip.className = `fixed bottom-20 right-4 sm:bottom-22 sm:right-6 z-50 ${config.tooltipClass} text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 max-w-xs`;
+                tooltipArrow.className = `absolute -bottom-2 right-6 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent ${config.arrowClass}`;
             }
 
+            function showTooltipTemporarily(message) {
+                tooltipContent.textContent = message;
+                statusTooltip.classList.remove('opacity-0');
+                statusTooltip.classList.add('opacity-100');
+                
+                setTimeout(() => {
+                    statusTooltip.classList.remove('opacity-100');
+                    statusTooltip.classList.add('opacity-0');
+                }, 3000);
+            }
+
+            function showTooltip(message) {
+                tooltipContent.textContent = message;
+                statusTooltip.classList.remove('opacity-0');
+                statusTooltip.classList.add('opacity-100');
+            }
+
+            function hideTooltip() {
+                statusTooltip.classList.remove('opacity-100');
+                statusTooltip.classList.add('opacity-0');
+            }
+
+            statusFab.addEventListener('mouseenter', () => {
+                const currentMessage = statusFab.title || 'مشاهده وضعیت اتصال';
+                showTooltip(currentMessage);
+            });
+
+            statusFab.addEventListener('mouseleave', hideTooltip);
+
             statusFab.addEventListener('click', () => {
-                statusDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const currentMessage = statusFab.title || 'مشاهده وضعیت اتصال';
+                showTooltipTemporarily(currentMessage);
             });
     
             function connectWebSocket() {
@@ -648,10 +696,6 @@
                 if (data.type === 'pong' && fromId === partnerId) {
                     lastPongReceivedTime = Date.now();
                     
-                    // اگر وضعیت "ناپایدار" بود، آن را به "متصل" تغییر بده
-                    if (statusDiv.textContent.includes('ناپایدار')) {
-                        updateStatus(`اتصال با ${fromId} برقرار شد`, 'connected');
-                    }
                     updateChatUIState(true);
                     
                     return;
