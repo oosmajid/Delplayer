@@ -89,9 +89,13 @@
             #media-chat-layout.chat-side-by-side #chat-panel {
                 flex: 0 0 360px;
                 max-width: 360px;
+                display: flex;
+                flex-direction: column;
             }
             #media-chat-layout.chat-side-by-side #chat-messages {
-                height: 18rem;
+                flex: 1;
+                min-height: 0;
+                height: auto;
             }
         }
     </style>
