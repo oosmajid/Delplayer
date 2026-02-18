@@ -72,6 +72,20 @@
             bottom: 60px; /* Adjust position to be above the input */
             left: 10px;
             z-index: 100;
+            opacity: 0;
+            transform: translateY(8px) scale(0.98);
+            transform-origin: bottom left;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 220ms;
+            will-change: transform, opacity;
+        }
+        emoji-picker.is-open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            visibility: visible;
+            pointer-events: auto;
+            transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
         }
         #media-chat-layout.chat-side-by-side {
             gap: 1rem;
@@ -169,7 +183,7 @@
                     <textarea id="chat-input" rows="1" class="w-full sm:flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1 text-white focus:outline-none" placeholder="پیام خود را بنویسید..." style="resize: none; direction: rtl; text-align: right;"></textarea>
                     <button id="emoji-btn" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-md">😊</button>
                 </div>
-                <emoji-picker class="light" style="display:none;"></emoji-picker>
+                <emoji-picker class="light"></emoji-picker>
             </div>
         </div>
     </div>
@@ -286,6 +300,8 @@
             const chatLayoutToggle = document.getElementById('chat-layout-toggle');
             const emojiBtn = document.getElementById('emoji-btn');
             const emojiPicker = document.querySelector('emoji-picker');
+            const playerPanel = document.getElementById('player-panel');
+            const chatPanel = document.getElementById('chat-panel');
 
             // --- متغیرهای وضعیت ---
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -306,18 +322,20 @@
             let replyingTo = null; // آبجکتی برای نگهداری اطلاعات پیام در حال ریپلای
             let isChatDocked = false;
             const replyPreviewContainer = document.createElement('div');
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 
             myIdSpan.textContent = myId;
+            emojiPicker.style.display = 'block';
 
             // --- Emoji Picker Logic ---
             function showEmojiPicker() {
                 if (hideEmojiPickerTimeout) clearTimeout(hideEmojiPickerTimeout);
-                emojiPicker.style.display = 'block';
+                emojiPicker.classList.add('is-open');
             }
 
             function hideEmojiPicker() {
-                emojiPicker.style.display = 'none';
+                emojiPicker.classList.remove('is-open');
             }
 
             function scheduleHideEmojiPicker() {
@@ -332,14 +350,20 @@
 
             emojiBtn.addEventListener('mouseenter', showEmojiPicker);
             // Keep click for touch devices where hover does not exist.
-            emojiBtn.addEventListener('click', showEmojiPicker);
+            emojiBtn.addEventListener('click', () => {
+                if (emojiPicker.classList.contains('is-open')) {
+                    hideEmojiPicker();
+                    return;
+                }
+                showEmojiPicker();
+            });
             
             emojiPicker.addEventListener('emoji-click', event => {
                 chatInput.value += event.detail.unicode;
             });
             
             document.addEventListener('pointermove', (event) => {
-                if (emojiPicker.style.display === 'none') return;
+                if (!emojiPicker.classList.contains('is-open')) return;
                 const path = event.composedPath();
                 const isOnEmojiUI = path.includes(emojiBtn) || path.includes(emojiPicker);
                 if (!isOnEmojiUI) {
@@ -365,9 +389,52 @@
                 chatLayoutToggle.setAttribute('aria-pressed', String(isChatDocked));
             }
 
-            chatLayoutToggle.addEventListener('click', () => {
+            function toggleChatLayoutSmooth() {
+                if (!playerPanel || !chatPanel || prefersReducedMotion) {
+                    isChatDocked = !isChatDocked;
+                    updateChatLayout();
+                    return;
+                }
+
+                const panels = [playerPanel, chatPanel];
+                const firstRects = new Map(panels.map(panel => [panel, panel.getBoundingClientRect()]));
+
                 isChatDocked = !isChatDocked;
                 updateChatLayout();
+
+                const lastRects = new Map(panels.map(panel => [panel, panel.getBoundingClientRect()]));
+
+                panels.forEach(panel => {
+                    const first = firstRects.get(panel);
+                    const last = lastRects.get(panel);
+                    if (!first || !last) return;
+
+                    const deltaX = first.left - last.left;
+                    const deltaY = first.top - last.top;
+                    const scaleX = first.width / last.width;
+                    const scaleY = first.height / last.height;
+
+                    panel.animate(
+                        [
+                            {
+                                transformOrigin: 'top left',
+                                transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`
+                            },
+                            {
+                                transformOrigin: 'top left',
+                                transform: 'translate(0, 0) scale(1, 1)'
+                            }
+                        ],
+                        {
+                            duration: 340,
+                            easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
+                        }
+                    );
+                });
+            }
+
+            chatLayoutToggle.addEventListener('click', () => {
+                toggleChatLayoutSmooth();
             });
 
             updateChatLayout();
