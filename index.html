@@ -302,17 +302,49 @@
             myIdSpan.textContent = myId;
 
             // --- Emoji Picker Logic ---
-            emojiBtn.addEventListener('click', () => {
-                emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
-            });
+            function showEmojiPicker() {
+                if (hideEmojiPickerTimeout) clearTimeout(hideEmojiPickerTimeout);
+                emojiPicker.style.display = 'block';
+            }
+
+            function hideEmojiPicker() {
+                emojiPicker.style.display = 'none';
+            }
+
+            function scheduleHideEmojiPicker() {
+                if (hideEmojiPickerTimeout) clearTimeout(hideEmojiPickerTimeout);
+                hideEmojiPickerTimeout = setTimeout(() => {
+                    hideEmojiPicker();
+                    hideEmojiPickerTimeout = null;
+                }, 40);
+            }
+
+            let hideEmojiPickerTimeout = null;
+
+            emojiBtn.addEventListener('mouseenter', showEmojiPicker);
+            // Keep click for touch devices where hover does not exist.
+            emojiBtn.addEventListener('click', showEmojiPicker);
             
             emojiPicker.addEventListener('emoji-click', event => {
                 chatInput.value += event.detail.unicode;
             });
             
+            document.addEventListener('pointermove', (event) => {
+                if (emojiPicker.style.display === 'none') return;
+                const path = event.composedPath();
+                const isOnEmojiUI = path.includes(emojiBtn) || path.includes(emojiPicker);
+                if (!isOnEmojiUI) {
+                    scheduleHideEmojiPicker();
+                } else if (hideEmojiPickerTimeout) {
+                    clearTimeout(hideEmojiPickerTimeout);
+                    hideEmojiPickerTimeout = null;
+                }
+            });
+            
             document.addEventListener('click', (event) => {
-                if (!emojiPicker.contains(event.target) && event.target !== emojiBtn) {
-                    emojiPicker.style.display = 'none';
+                const path = event.composedPath();
+                if (!path.includes(emojiPicker) && !path.includes(emojiBtn)) {
+                    scheduleHideEmojiPicker();
                 }
             });
 
