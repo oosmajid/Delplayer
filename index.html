@@ -299,6 +299,7 @@
             let partnerVideoDuration = null;
             let heartbeatInterval = null;
             let lastPongReceivedTime = 0;
+            let isPeerConnectionUnstable = false;
             let audioCtx;
             let reconnectAttempts = 0;
             const MAX_RECONNECT_INTERVAL = 90000;
@@ -543,6 +544,7 @@
 
                     // اگر قبل از قطعی به کسی متصل بودیم
                     if (partnerId) {
+                        isPeerConnectionUnstable = true;
                         updateStatus(`اتصال با سرور برقرار شد، در تلاش برای اتصال مجدد به ${partnerId}...`, 'connecting');
                         // یک درخواست اتصال مجدد آرام ارسال می‌کنیم
                         sendDataTo(partnerId, { type: 'reconnect_request' });
@@ -601,6 +603,7 @@
                 
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
                 heartbeatInterval = null;
+                isPeerConnectionUnstable = false;
                 updateChatUIState(false);
 
                 if (regenerateId && ws && ws.readyState === WebSocket.OPEN) {
@@ -622,6 +625,7 @@
             function startHeartbeat() {
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
                 lastPongReceivedTime = Date.now();
+                isPeerConnectionUnstable = false;
                 
                 const PING_INTERVAL = 5000; 
                 const TIMEOUT = 8000;
@@ -633,16 +637,16 @@
                         return;
                     }
 
-                    if (Date.now() - lastPongReceivedTime > 8000) {
-                        console.error("Heartbeat failed. Peer seems disconnected.");
-                        updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
-                        updateChatUIState(false);
-                        videoPlayer.pause();
-                        if (isYouTubeMode && ytPlayer) ytPlayer.pauseVideo();
-                        if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
-                        // clearInterval(heartbeatInterval);
-                        // heartbeatInterval = null; 
-                        // return;
+                    if (Date.now() - lastPongReceivedTime > TIMEOUT) {
+                        if (!isPeerConnectionUnstable) {
+                            console.error("Heartbeat failed. Peer seems disconnected.");
+                            isPeerConnectionUnstable = true;
+                            updateStatus('ارتباط با طرف مقابل ناپایدار است. منتظر اتصال مجدد...', 'connecting');
+                            updateChatUIState(false);
+                            videoPlayer.pause();
+                            if (isYouTubeMode && ytPlayer) ytPlayer.pauseVideo();
+                            if (document.fullscreenElement) document.exitFullscreen().catch(err => console.error(`Error attempting to exit fullscreen: ${err.message}`));
+                        }
                     }
                     sendDataTo(partnerId, { type: 'ping' });
                 }, PING_INTERVAL);
@@ -691,6 +695,7 @@
             function handleReceivedData(data, fromId) {
                 if (fromId === partnerId && !heartbeatInterval) {
                     console.log("Peer has reconnected. Restarting heartbeat.");
+                    isPeerConnectionUnstable = false;
                     updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
                     updateChatUIState(true);
                     startHeartbeat();
@@ -699,6 +704,10 @@
                 if (data.type === 'ping') { sendDataTo(fromId, { type: 'pong' }); return; }
                 if (data.type === 'pong' && fromId === partnerId) {
                     lastPongReceivedTime = Date.now();
+                    if (isPeerConnectionUnstable) {
+                        isPeerConnectionUnstable = false;
+                        updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
+                    }
                     
                     updateChatUIState(true);
                     
@@ -707,6 +716,7 @@
 
                 if (data.type === 'connect_request') {
                     partnerId = fromId;
+                    isPeerConnectionUnstable = false;
                     partnerIdInput.value = fromId;
                     updateStatus(`متصل به: ${fromId}`, 'connected');
                     document.getElementById('connect-success-tick').classList.remove('hidden');
@@ -721,6 +731,7 @@
 
                 if (data.type === 'connect_confirm') {
                     partnerId = fromId;
+                    isPeerConnectionUnstable = false;
                     updateStatus(`اتصال با ${fromId} برقرار شد`, 'connected');
                     document.getElementById('connect-success-tick').classList.remove('hidden');
                     connectBtn.classList.add('hidden');
@@ -735,6 +746,7 @@
                     // اگر از طرف مقابل درخواست اتصال مجدد دریافت کردیم، وضعیت را به‌روز می‌کنیم
                     // و heartbeat را مجددا راه‌اندازی می‌کنیم.
                     if (fromId === partnerId) {
+                        isPeerConnectionUnstable = false;
                         updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
                         updateChatUIState(true); // چت را فعال می‌کنیم
                         if (!heartbeatInterval) { // فقط اگر heartbeat متوقف شده بود، دوباره شروع کن
@@ -749,6 +761,7 @@
                 if (data.type === 'reconnect_confirm') {
                     // اگر تأییدیه اتصال مجدد را دریافت کردیم
                     if (fromId === partnerId) {
+                        isPeerConnectionUnstable = false;
                         updateStatus(`اتصال با ${fromId} مجددا برقرار شد`, 'connected');
                         updateChatUIState(true); // چت را فعال می‌کنیم
                         if (!heartbeatInterval) { // فقط اگر heartbeat متوقف شده بود، دوباره شروع کن
