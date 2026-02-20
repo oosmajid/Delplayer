@@ -342,6 +342,13 @@
                 emojiPicker.classList.remove('is-open');
             }
 
+            function scrollChatToLatest() {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                requestAnimationFrame(() => {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                });
+            }
+
             function scheduleHideEmojiPicker() {
                 if (hideEmojiPickerTimeout) clearTimeout(hideEmojiPickerTimeout);
                 hideEmojiPickerTimeout = setTimeout(() => {
@@ -364,6 +371,11 @@
             
             emojiPicker.addEventListener('emoji-click', event => {
                 chatInput.value += event.detail.unicode;
+                if (!chatInput.disabled) {
+                    chatInput.focus();
+                    const end = chatInput.value.length;
+                    chatInput.setSelectionRange(end, end);
+                }
             });
             
             document.addEventListener('pointermove', (event) => {
@@ -397,6 +409,7 @@
                 if (!playerPanel || !chatPanel || prefersReducedMotion) {
                     isChatDocked = !isChatDocked;
                     updateChatLayout();
+                    scrollChatToLatest();
                     return;
                 }
 
@@ -435,6 +448,8 @@
                         }
                     );
                 });
+
+                setTimeout(scrollChatToLatest, 350);
             }
 
             chatLayoutToggle.addEventListener('click', () => {
