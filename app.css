@@ -1,0 +1,689 @@
+/* ============================================================
+   دل‌پلیر، دیزاین‌سیستم «غروب صمیمی»
+   ============================================================ */
+
+@font-face{font-family:Vazirmatn;font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/Vazirmatn-Regular.woff2) format("woff2")}
+@font-face{font-family:Vazirmatn;font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/Vazirmatn-Medium.woff2) format("woff2")}
+@font-face{font-family:Vazirmatn;font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/Vazirmatn-Bold.woff2) format("woff2")}
+
+:root{
+  /* زمینه و سطوح */
+  --bg:#180F14;
+  --surface:#241820;
+  --surface-2:#1E141B;
+  --field:#2C1E26;
+  --line:#3A2830;
+  --line-soft:#31212A;
+
+  /* متن */
+  --text:#F8EDE9;
+  --muted:#B0949C;
+  --faint:#8A7078;
+
+  /* تأکید */
+  --accent:#F0897A;
+  --accent-hi:#F49C8E;
+  --accent-2:#F2C879;
+  --accent-ink:#2A0D08;
+
+  /* معنایی */
+  --ok:#6FCF97;
+  --warn:#F2C879;
+  --err:#F2705F;
+
+  /* شکل */
+  --r-lg:20px;
+  --r-md:14px;
+  --r-sm:10px;
+  --shadow:0 30px 70px -34px rgba(240,137,122,.35);
+  --shadow-sm:0 10px 30px -18px rgba(0,0,0,.8);
+  --ring:0 0 0 3px rgba(240,137,122,.32);
+
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+/* روی <svg> صفت hidden اثری ندارد (عنصر foreign است) و روی .btn هم
+   display پیش‌فرض مرورگر را کلاس ما بازنویسی می‌کند. */
+[hidden]{display:none !important}
+
+html{-webkit-text-size-adjust:100%}
+
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Vazirmatn,system-ui,"Segoe UI",Tahoma,sans-serif;
+  font-size:16px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* هالهٔ غروب در گوشه‌ها */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 55% at 85% -5%,rgba(242,200,121,.13),transparent 65%),
+    radial-gradient(ellipse 60% 55% at 8% 100%,rgba(240,137,122,.12),transparent 65%);
+}
+
+h1,h2,h3{margin:0;font-weight:700;line-height:1.35;text-wrap:balance}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:3px}
+
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.shell{width:100%;max-width:1180px;margin:0 auto;padding:1.5rem 1rem 0}
+.stack{display:grid;gap:1.5rem}
+
+/* ---------- کارت ---------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  padding:1.4rem;
+  box-shadow:var(--shadow-sm);
+}
+.card-lead{display:grid;gap:.35rem;margin-bottom:1.15rem}
+.card-lead h2{font-size:1.15rem}
+.card-lead p{color:var(--muted);font-size:.9rem;line-height:1.7}
+
+/* ---------- سربرگ ---------- */
+.masthead{text-align:center;padding:1.5rem 0 .5rem;display:grid;gap:.6rem;justify-items:center}
+.masthead h1{
+  font-size:clamp(1.6rem,4.6vw,2.4rem);letter-spacing:-.02em;
+  display:flex;align-items:center;gap:.55rem;
+}
+.masthead h1 .logo{display:flex;flex:0 0 auto}
+.masthead h1 .logo svg{
+  width:1.15em;height:1.15em;display:block;
+  filter:drop-shadow(0 6px 16px rgba(240,137,122,.45));
+}
+.masthead p{color:var(--muted);max-width:56ch;font-size:.95rem}
+
+/* ---------- فرم ---------- */
+.field-row{display:flex;gap:.6rem;flex-wrap:wrap}
+.field-row>.input{flex:1 1 16rem;min-width:0}
+
+.input{
+  width:100%;
+  background:var(--field);
+  border:1px solid var(--line);
+  border-radius:var(--r-md);
+  color:var(--text);
+  font:inherit;font-size:.95rem;
+  padding:.7rem 1rem;
+  transition:border-color .18s,box-shadow .18s;
+}
+.input::placeholder{color:var(--faint)}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+.input:disabled{opacity:.45;cursor:not-allowed}
+.input.center{text-align:center}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  font:inherit;font-weight:700;font-size:.92rem;
+  padding:.7rem 1.35rem;
+  border-radius:var(--r-md);
+  border:1px solid transparent;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:transform .16s cubic-bezier(.22,1,.36,1),filter .16s,background .16s,border-color .16s;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+.btn-primary{background:var(--accent);color:var(--accent-ink);box-shadow:0 8px 26px -12px rgba(240,137,122,.8)}
+.btn-primary:hover{background:var(--accent-hi)}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;border-color:rgba(242,112,95,.5);color:var(--err)}
+.btn-danger:hover{background:rgba(242,112,95,.12);border-color:var(--err)}
+
+/* دراپ‌زون انتخاب فایل */
+.drop{
+  display:flex;align-items:center;justify-content:center;gap:.7rem;
+  padding:1.1rem 1.4rem;
+  border:1.5px dashed var(--line);
+  border-radius:var(--r-lg);
+  background:var(--surface-2);
+  color:var(--text);
+  cursor:pointer;
+  text-align:center;
+  transition:border-color .18s,background .18s,color .18s;
+}
+.drop:hover,.drop.is-over{border-color:var(--accent);background:rgba(240,137,122,.07);color:var(--accent)}
+.drop svg{width:1.5rem;height:1.5rem;flex:0 0 auto;opacity:.75}
+.drop .drop-text{display:grid;gap:.15rem;text-align:center;justify-items:center}
+.drop .drop-text b{font-weight:500;font-size:.95rem}
+.drop .drop-text small{color:var(--muted);font-size:.78rem;line-height:1.5}
+@media (max-width:520px){
+  .drop{flex-direction:column;gap:.5rem;padding:1rem}
+}
+
+.divider{display:flex;align-items:center;gap:.9rem;color:var(--faint);font-size:.8rem}
+.divider::before,.divider::after{content:"";height:1px;background:var(--line-soft);flex:1}
+
+/* ---------- نوار اتصال ---------- */
+.connect{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between}
+.id-block{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.id-block .label{color:var(--muted);font-size:.88rem}
+.id-chip{
+  font-family:var(--mono);font-size:1rem;letter-spacing:.06em;direction:ltr;
+  background:var(--field);border:1px solid var(--line);color:var(--accent-2);
+  border-radius:var(--r-sm);padding:.35rem .8rem;cursor:pointer;
+  display:inline-flex;align-items:center;gap:.5rem;
+  transition:border-color .18s,color .18s;
+}
+.id-chip:hover{border-color:var(--accent-2)}
+.id-chip svg{width:.95rem;height:.95rem;opacity:.6}
+.copied{color:var(--ok);font-size:.8rem;opacity:0;transition:opacity .2s}
+.copied.show{opacity:1}
+
+.connect-actions{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.connect-actions .input{width:12rem}
+
+/* ---------- چیدمان پلیر و چت ---------- */
+.stage{display:grid;gap:1rem}
+@media (min-width:1024px){
+  .stage.docked{grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+  .stage.docked #chat-panel{position:sticky;top:1rem;display:flex;flex-direction:column;max-height:calc(100vh - 2rem)}
+  .stage.docked #chat-log{flex:1 1 auto;min-height:8rem}
+}
+
+/* ============================================================
+   پلیر
+   ============================================================ */
+.player{
+  position:relative;
+  background:#0F0A0D;
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  aspect-ratio:16/9;
+  box-shadow:var(--shadow);
+  user-select:none;
+}
+.player.is-idle{cursor:none}
+.player:fullscreen{border-radius:0;border:0;aspect-ratio:auto;width:100%;height:100%}
+.player video,.player .yt-host{
+  position:absolute;inset:0;width:100%;height:100%;background:#000;display:block;
+}
+.player video{object-fit:contain}
+.player .yt-host{border:0}
+.player .yt-host iframe{width:100%;height:100%;border:0}
+.player[data-mode="youtube"] video{display:none}
+.player[data-mode="html5"] .yt-host{display:none}
+
+/* لایهٔ خالی/شروع */
+.player-empty{
+  position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:.6rem;
+  color:var(--faint);text-align:center;padding:1.5rem;
+  background:radial-gradient(ellipse 60% 60% at 50% 45%,rgba(240,137,122,.10),transparent 70%);
+}
+.player-empty .glyph{width:3rem;height:3rem;opacity:.5;color:var(--accent)}
+.player-empty p{font-size:.9rem;max-width:32ch;line-height:1.7}
+.player.has-media .player-empty{display:none}
+
+/* دکمهٔ پخش وسط */
+.big-play{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:5rem;height:5rem;border-radius:50%;border:0;cursor:pointer;
+  background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;
+  box-shadow:0 14px 40px -10px rgba(240,137,122,.75);
+  transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .22s;
+  z-index:6;
+}
+.big-play svg{width:2rem;height:2rem;margin-right:-.2rem}
+.big-play:hover{transform:translate(-50%,-50%) scale(1.07)}
+.player.is-playing .big-play,.player:not(.has-media) .big-play{opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.8)}
+
+/* اسپینر بافر */
+.buffering{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7;
+  display:none;flex-direction:column;align-items:center;gap:.7rem;
+  color:var(--text);font-size:.85rem;text-shadow:0 2px 8px rgba(0,0,0,.9);
+}
+.player.is-buffering .buffering{display:flex}
+.spinner{
+  width:2.5rem;height:2.5rem;border-radius:50%;
+  border:3px solid rgba(248,237,233,.2);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- زیرنویس ---------- */
+.subs{
+  position:absolute;left:0;right:0;bottom:4.5rem;z-index:5;
+  display:flex;justify-content:center;padding:0 6%;
+  pointer-events:none;transition:bottom .25s ease;
+}
+.player.controls-hidden .subs{bottom:2rem}
+.subs-text{
+  display:inline-block;max-width:100%;
+  font-size:clamp(1rem,2.3vw,1.6rem);font-weight:500;line-height:1.5;
+  color:#fff;text-align:center;white-space:pre-wrap;
+  text-shadow:0 2px 4px rgba(0,0,0,.95),0 0 12px rgba(0,0,0,.75);
+  padding:.15em .5em;border-radius:8px;
+  background:rgba(10,6,8,.35);
+  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.subs:empty,.subs-text:empty{display:none}
+
+/* ---------- چت روی تصویر ---------- */
+.overlay-chat{
+  position:absolute;left:1rem;bottom:5.5rem;z-index:8;
+  display:flex;flex-direction:column;justify-content:flex-end;gap:.4rem;
+  max-width:min(24rem,55%);pointer-events:none;
+  transition:bottom .25s ease;
+}
+.player.controls-hidden .overlay-chat{bottom:2.5rem}
+.overlay-msg{
+  --enter:14px;
+  align-self:flex-start;
+  max-width:100%;
+  background:rgba(36,24,32,.82);
+  border:1px solid rgba(240,137,122,.28);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-radius:var(--r-md);
+  padding:.4rem .75rem;
+  font-size:.88rem;line-height:1.6;
+  color:var(--text);
+  box-shadow:0 12px 30px -14px rgba(0,0,0,.9);
+  word-break:break-word;
+  animation:ovIn .32s cubic-bezier(.22,1,.36,1) both;
+}
+.overlay-msg.mine{
+  align-self:flex-end;
+  background:rgba(240,137,122,.9);
+  border-color:rgba(255,255,255,.25);
+  color:var(--accent-ink);
+  font-weight:500;
+}
+.overlay-msg .who{
+  display:block;font-size:.68rem;letter-spacing:.02em;opacity:.75;margin-bottom:.1rem;font-weight:500;
+}
+.overlay-msg.leaving{animation:ovOut .45s ease forwards}
+@keyframes ovIn{from{opacity:0;transform:translateY(var(--enter)) scale(.96)}to{opacity:1;transform:none}}
+@keyframes ovOut{to{opacity:0;transform:translateY(-6px) scale(.98);margin-bottom:-2.2rem}}
+
+/* ورودی چت داخل پلیر: سمت راست، مقابل جایی که پیام‌ها ظاهر می‌شوند */
+.overlay-input{
+  position:absolute;right:1rem;left:auto;bottom:5.5rem;z-index:9;
+  width:min(17rem,45%);
+  display:none;gap:.5rem;
+  transition:bottom .25s ease;
+}
+.player.chat-open .overlay-input{display:flex}
+.player.controls-hidden .overlay-input{bottom:2.5rem}
+.overlay-input input{
+  flex:1;min-width:0;
+  background:rgba(20,12,16,.86);
+  border:1px solid rgba(240,137,122,.4);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-radius:var(--r-md);color:#fff;font:inherit;font-size:.85rem;padding:.45rem .75rem;
+}
+.overlay-input input::placeholder{color:rgba(248,237,233,.5)}
+.overlay-input input:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+@media (max-width:560px){.overlay-input{width:min(14rem,60%)}}
+
+/* ---------- نوار کنترل ---------- */
+.controls{
+  position:absolute;left:0;right:0;bottom:0;z-index:10;
+  padding:2.5rem .75rem .6rem;
+  background:linear-gradient(to top,rgba(10,6,8,.92) 0%,rgba(10,6,8,.72) 45%,transparent 100%);
+  display:grid;gap:.35rem;
+  opacity:1;transform:translateY(0);
+  transition:opacity .25s ease,transform .25s ease;
+}
+.player.controls-hidden .controls{opacity:0;transform:translateY(8px);pointer-events:none}
+.player:not(.has-media) .controls{display:none}
+
+/* نوار پیشرفت */
+.scrub{
+  position:relative;height:1rem;display:flex;align-items:center;cursor:pointer;touch-action:none;
+}
+/* محور زمان چپ‌به‌راست می‌ماند، مثل هر پلیر دیگری، حتی در چیدمان راست‌به‌چپ */
+.scrub-track{
+  position:relative;direction:ltr;height:5px;width:100%;
+  border-radius:99px;background:rgba(248,237,233,.22);overflow:hidden;
+}
+.scrub-buffer{position:absolute;top:0;bottom:0;left:0;right:auto;background:rgba(248,237,233,.2);width:0}
+.scrub-fill{position:absolute;top:0;bottom:0;left:0;right:auto;background:var(--accent);width:0;border-radius:99px}
+.scrub-thumb{
+  position:absolute;top:50%;left:100%;width:13px;height:13px;border-radius:50%;
+  background:var(--accent);transform:translate(-50%,-50%) scale(0);
+  box-shadow:0 2px 10px rgba(0,0,0,.6);transition:transform .16s ease;
+}
+.scrub:hover .scrub-thumb,.scrub.dragging .scrub-thumb{transform:translate(-50%,-50%) scale(1)}
+.scrub:hover .scrub-track,.scrub.dragging .scrub-track{height:7px}
+.scrub-track{transition:height .16s ease}
+
+.scrub-tip{
+  position:absolute;bottom:1.4rem;left:0;transform:translateX(-50%);
+  background:rgba(20,12,16,.95);border:1px solid var(--line);
+  border-radius:8px;padding:.1rem .45rem;font-size:.72rem;font-family:var(--mono);
+  color:#fff;pointer-events:none;opacity:0;transition:opacity .15s;white-space:nowrap;
+}
+.scrub:hover .scrub-tip,.scrub.dragging .scrub-tip{opacity:1}
+
+.control-row{display:flex;align-items:center;gap:.15rem}
+.control-row .spacer{flex:1}
+
+.ctl{
+  width:2.3rem;height:2.3rem;flex:0 0 auto;
+  display:grid;place-items:center;
+  background:transparent;border:0;border-radius:var(--r-sm);
+  color:#fff;cursor:pointer;
+  transition:background .16s,color .16s,opacity .16s;
+}
+.ctl svg{width:1.25rem;height:1.25rem;pointer-events:none}
+.ctl:hover{background:rgba(248,237,233,.14)}
+.ctl.on{color:var(--accent)}
+.ctl:disabled{opacity:.3;cursor:not-allowed}
+.ctl[data-badge]::after{
+  content:attr(data-badge);position:absolute;
+}
+
+.time{
+  font-family:var(--mono);font-size:.78rem;color:#fff;opacity:.9;
+  padding:0 .5rem;white-space:nowrap;font-variant-numeric:tabular-nums;direction:ltr;
+}
+
+/* ولوم */
+.volume{display:flex;align-items:center;gap:.1rem}
+.volume-slider{
+  width:0;opacity:0;overflow:hidden;
+  transition:width .22s cubic-bezier(.22,1,.36,1),opacity .18s;
+}
+.volume:hover .volume-slider,.volume:focus-within .volume-slider{width:4.5rem;opacity:1}
+.volume-slider input{
+  width:4.5rem;height:1.5rem;margin:0;accent-color:var(--accent);cursor:pointer;background:transparent;
+}
+
+/* منوها */
+.menu-wrap{position:relative;display:flex}
+.menu{
+  position:absolute;bottom:calc(100% + .5rem);left:50%;transform:translateX(-50%) translateY(6px);
+  min-width:11rem;max-height:16rem;overflow-y:auto;
+  background:rgba(28,18,24,.97);
+  border:1px solid var(--line);border-radius:var(--r-md);
+  padding:.35rem;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.9);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .16s,transform .16s,visibility 0s linear .16s;
+  z-index:20;
+}
+.menu.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateX(-50%) translateY(0);transition-delay:0s}
+.menu-title{
+  font-size:.7rem;color:var(--faint);padding:.3rem .6rem .35rem;
+  border-bottom:1px solid var(--line-soft);margin-bottom:.25rem;
+}
+.menu-item{
+  display:flex;align-items:center;gap:.5rem;width:100%;
+  background:transparent;border:0;border-radius:var(--r-sm);
+  color:var(--text);font:inherit;font-size:.85rem;text-align:right;
+  padding:.4rem .6rem;cursor:pointer;
+}
+.menu-item:hover{background:rgba(240,137,122,.14)}
+.menu-item .check{width:1rem;flex:0 0 auto;color:var(--accent);opacity:0}
+.menu-item[aria-checked="true"]{color:var(--accent)}
+.menu-item[aria-checked="true"] .check{opacity:1}
+.menu-item .sub{color:var(--faint);font-size:.72rem;margin-right:auto;font-family:var(--mono);direction:ltr}
+
+/* نوار پیشرفت استخراج زیرنویس */
+.subs-scan{
+  position:absolute;top:.75rem;left:.75rem;z-index:11;
+  display:none;align-items:center;gap:.5rem;
+  background:rgba(28,18,24,.9);border:1px solid var(--line);
+  border-radius:99px;padding:.28rem .8rem;font-size:.75rem;color:var(--text);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.subs-scan.show{display:flex}
+.subs-scan .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent-2);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* اعلان روی پلیر */
+.player-toast{
+  position:absolute;top:.75rem;right:.75rem;z-index:12;
+  background:rgba(28,18,24,.94);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:.4rem .85rem;font-size:.8rem;
+  color:var(--text);max-width:60%;
+  opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .25s;
+  pointer-events:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.player-toast.show{opacity:1;transform:none}
+
+/* هشدار اختلاف طول ویدیو */
+.warn-bar{
+  display:none;align-items:center;gap:.5rem;
+  background:rgba(242,200,121,.12);border:1px solid rgba(242,200,121,.35);
+  color:var(--warn);border-radius:var(--r-md);padding:.6rem .9rem;font-size:.85rem;
+}
+.warn-bar.show{display:flex}
+
+/* ============================================================
+   چت
+   ============================================================ */
+#chat-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1rem;display:flex;flex-direction:column;gap:.7rem;min-height:0}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem}
+.chat-head .title{display:flex;align-items:center;gap:.45rem;font-weight:700;color:var(--accent);font-size:.95rem}
+.chat-head .actions{display:flex;gap:.3rem}
+.icon-btn{
+  width:2.1rem;height:2.1rem;display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--muted);cursor:pointer;transition:color .16s,border-color .16s,background .16s;
+}
+.icon-btn:hover{color:var(--accent);border-color:var(--accent)}
+.icon-btn svg{width:1.05rem;height:1.05rem}
+.icon-btn.on{color:var(--accent);border-color:var(--accent)}
+
+#chat-log{
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-md);
+  padding:.6rem;height:11rem;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:.3rem;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+}
+#chat-log::-webkit-scrollbar{width:8px}
+#chat-log::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+
+.chat-empty{margin:auto;color:var(--faint);font-size:.82rem;text-align:center;line-height:1.8}
+
+/* دکمهٔ پاسخ همیشه سمتِ داخلیِ حباب می‌نشیند (نه زیرش):
+   پیام‌های من راست‌چین‌اند و دکمه سمت چپشان، پیام‌های طرف مقابل چپ‌چین
+   و دکمه سمت راستشان. با پراپرتی‌های منطقی تا در RTL هم درست بماند. */
+.msg-row{display:flex;align-items:center;gap:.4rem;width:100%}
+.msg-row.mine .bubble{order:1}
+.msg-row.mine .reply-btn{order:2;margin-inline-end:auto}
+.msg-row.theirs .reply-btn{order:1;margin-inline-start:auto}
+.msg-row.theirs .bubble{order:2}
+.bubble{
+  max-width:min(80%,22rem);padding:.4rem .7rem;border-radius:var(--r-md);
+  font-size:.88rem;line-height:1.65;word-break:break-word;white-space:pre-wrap;
+  background:var(--field);border:1px solid var(--line);
+  transition:background .3s;
+}
+.msg-row.mine .bubble{background:var(--accent);color:var(--accent-ink);border-color:transparent;border-bottom-left-radius:5px}
+.msg-row.theirs .bubble{border-bottom-right-radius:5px}
+.bubble.flash{background:var(--accent-2);color:var(--accent-ink)}
+
+.quote{
+  display:block;margin-bottom:.3rem;padding:.25rem .5rem;
+  border-right:2px solid var(--accent-2);
+  background:rgba(0,0,0,.22);border-radius:6px;
+  font-size:.78rem;color:inherit;opacity:.85;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.msg-row.mine .quote{background:rgba(0,0,0,.15)}
+
+.reply-btn{
+  flex:0 0 auto;width:1.7rem;height:1.7rem;display:grid;place-items:center;
+  background:transparent;border:0;color:var(--faint);cursor:pointer;
+  opacity:0;transition:opacity .16s,color .16s,background .16s;border-radius:7px;
+}
+.msg-row:hover .reply-btn,.reply-btn:focus-visible{opacity:1}
+.reply-btn:hover{color:var(--accent);background:var(--field)}
+.reply-btn svg{width:.95rem;height:.95rem}
+/* روی لمسی hover وجود ندارد؛ دکمه باید همیشه دیده شود */
+@media (hover:none){.reply-btn{opacity:.5}}
+
+.reply-preview{
+  display:none;align-items:center;justify-content:space-between;gap:.6rem;
+  background:var(--surface-2);border:1px solid var(--line);border-right:2px solid var(--accent);
+  border-radius:var(--r-sm);padding:.4rem .7rem;font-size:.8rem;color:var(--muted);
+}
+.reply-preview.show{display:flex}
+.reply-preview .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reply-preview button{background:none;border:0;color:var(--err);font-size:1.1rem;cursor:pointer;line-height:1;padding:0 .2rem}
+
+/* هر سه عنصر نوار نوشتن دقیقاً هم‌ارتفاع‌اند و با رشد متن، دکمه‌ها
+   کف‌چین می‌مانند. --compose-h تنها منبع این ارتفاع است. */
+.chat-compose{--compose-h:2.7rem;display:flex;gap:.45rem;align-items:flex-end}
+.chat-compose textarea{
+  flex:1;min-width:0;resize:none;
+  height:var(--compose-h);min-height:var(--compose-h);max-height:7rem;
+  background:var(--field);border:1px solid var(--line);border-radius:var(--r-md);
+  color:var(--text);font:inherit;font-size:.9rem;line-height:1.5;
+  padding:.55rem .8rem;
+}
+.chat-compose textarea:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+.chat-compose textarea:disabled{opacity:.45;cursor:not-allowed}
+.chat-compose .btn{height:var(--compose-h);padding:0 1.2rem}
+.chat-compose .icon-btn{width:var(--compose-h);height:var(--compose-h);font-size:1.15rem}
+
+.compose-wrap{position:relative}
+
+/* پنل ایموجی: داخلی، بدون وابستگی بیرونی */
+/* کنار خودِ دکمهٔ ایموجی باز می‌شود (دکمه در RTL سمت راست است) */
+.emoji-panel{
+  position:absolute;bottom:calc(100% + .5rem);right:0;left:auto;z-index:60;
+  width:min(20rem,calc(100vw - 3rem));max-height:15rem;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:.6rem;box-shadow:0 24px 60px -24px rgba(0,0,0,.9);
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(8px) scale(.98);transform-origin:bottom right;
+  transition:opacity .18s ease,transform .22s cubic-bezier(.22,1,.36,1),visibility 0s linear .22s;
+}
+/* پلی نامرئی بین دکمه و پنل تا موس در فاصلهٔ بینشان پنل را نبندد */
+.emoji-panel::after{content:"";position:absolute;left:0;right:0;top:100%;height:.6rem}
+.emoji-panel.open{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}
+.emoji-panel::-webkit-scrollbar{width:8px}
+.emoji-panel::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.emoji-group{
+  font-size:.72rem;color:var(--faint);padding:.4rem .15rem .3rem;
+  position:sticky;top:-.6rem;background:var(--surface);
+}
+.emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(2rem,1fr));gap:.1rem}
+.emoji{
+  background:none;border:0;cursor:pointer;font-size:1.2rem;line-height:1;
+  padding:.3rem 0;border-radius:8px;transition:background .12s,transform .12s;
+}
+.emoji:hover{background:var(--field);transform:scale(1.15)}
+
+/* ============================================================
+   وضعیت شناور
+   ============================================================ */
+.status-fab{
+  position:fixed;bottom:1rem;right:1rem;z-index:70;
+  width:3rem;height:3rem;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);color:var(--muted);
+  box-shadow:var(--shadow-sm);
+  transition:background .2s,border-color .2s,color .2s;
+}
+.status-fab svg{width:1.25rem;height:1.25rem}
+.status-fab[data-state="connected"],.status-fab[data-state="success"]{background:rgba(111,207,151,.16);border-color:var(--ok);color:var(--ok)}
+.status-fab[data-state="connecting"]{background:rgba(242,200,121,.16);border-color:var(--warn);color:var(--warn)}
+.status-fab[data-state="error"]{background:rgba(242,112,95,.16);border-color:var(--err);color:var(--err)}
+
+.status-tip{
+  position:fixed;bottom:4.4rem;right:1rem;z-index:70;max-width:min(20rem,calc(100vw - 2rem));
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:.55rem .9rem;font-size:.83rem;color:var(--text);
+  box-shadow:var(--shadow-sm);
+  opacity:0;transform:translateY(6px);pointer-events:none;
+  transition:opacity .25s,transform .25s;
+}
+.status-tip.show{opacity:1;transform:none}
+
+@media (min-width:640px){
+  .status-fab{bottom:1.5rem;right:1.5rem}
+  .status-tip{bottom:5rem;right:1.5rem}
+}
+
+/* ============================================================
+   بخش‌های محتوایی
+   ============================================================ */
+.info-section{margin-top:2rem}
+.info-head{text-align:center;display:grid;gap:.4rem;padding-bottom:1.1rem;border-bottom:1px solid var(--line-soft);margin-bottom:1.4rem}
+.info-head h2{font-size:1.3rem;color:var(--accent)}
+.info-head p{color:var(--muted);font-size:.9rem}
+
+.steps{display:grid;gap:1.2rem}
+@media (min-width:768px){.steps{grid-template-columns:repeat(3,1fr)}}
+.step{display:grid;gap:.45rem;justify-items:center;text-align:center}
+/* ارقام فارسی در فونت مونواسپیس وجود ندارند و به فونت پشتیبان می‌افتادند؛
+   با وزیرمتن و line-height ثابت، هم درست دیده می‌شوند هم دقیق وسط می‌نشینند. */
+.step .num{
+  width:2.6rem;height:2.6rem;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(240,137,122,.13);
+  border:1px solid rgba(240,137,122,.3);
+  box-shadow:0 6px 18px -10px rgba(240,137,122,.7);
+  color:var(--accent);
+  font-size:1.15rem;font-weight:700;line-height:1;
+  margin-bottom:.3rem;
+}
+.step h3{font-size:1rem}
+.step p{color:var(--muted);font-size:.87rem;line-height:1.75}
+
+.features{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+.feature{
+  display:grid;gap:.5rem;align-content:start;
+  background:var(--surface-2);
+  border:1px solid var(--line-soft);
+  border-radius:var(--r-md);
+  padding:1.1rem;
+  transition:border-color .2s,transform .2s cubic-bezier(.22,1,.36,1),background .2s;
+}
+.feature:hover{border-color:var(--accent);transform:translateY(-2px);background:rgba(240,137,122,.05)}
+.feature-icon{
+  width:2.4rem;height:2.4rem;display:grid;place-items:center;
+  border-radius:var(--r-sm);
+  background:rgba(240,137,122,.13);
+  border:1px solid rgba(240,137,122,.28);
+  color:var(--accent);
+}
+.feature-icon svg{width:1.25rem;height:1.25rem}
+.feature h3{font-size:.98rem}
+.feature p{color:var(--muted);font-size:.86rem;line-height:1.8}
+
+.kbd-list{display:grid;gap:.4rem}
+@media (min-width:640px){.kbd-list{grid-template-columns:repeat(2,1fr)}}
+.kbd-row{display:flex;align-items:center;gap:.6rem;font-size:.85rem;color:var(--muted)}
+kbd{
+  font-family:var(--mono);font-size:.72rem;background:var(--field);
+  border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;
+  padding:.1rem .45rem;color:var(--text);direction:ltr;white-space:nowrap;
+}
+
+.site-footer{text-align:center;padding:2rem 1rem 3rem;color:var(--muted);font-size:.88rem}
+.site-footer a{font-weight:500}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;transition-duration:.001ms !important}
+  .btn:hover{transform:none}
+}
