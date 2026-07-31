@@ -17,8 +17,15 @@ module.exports = {
     autorestart: true, 
     
     // حداکثر حافظه‌ای که برنامه می‌تواند استفاده کند
-    max_memory_restart: '1G', 
-    
+    max_memory_restart: '1G',
+
+    env: {
+      NODE_ENV: 'production',
+      // پشت nginx است، پس IP واقعی کاربر از x-forwarded-for خوانده می‌شود.
+      // اگر روزی nginx حذف شد، این را روی '0' بگذارید.
+      TRUST_PROXY: '1',
+    },
+
     // اگر از نسخه خاصی از node استفاده می‌کنید
     // interpreter: '/home/user/.nvm/versions/node/v18.17.1/bin/node', 
   }],
