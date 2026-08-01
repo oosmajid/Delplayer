@@ -115,7 +115,8 @@ let ytReady = false;
 // بدون این دو پنجره، هر دستوری که خودمان دادیم دوباره برای طرف مقابل ارسال
 // می‌شود و دو طرف بی‌وقفه همدیگر را متوقف و پخش می‌کنند.
 let ytSuppressUntil = 0;
-let ytSeekUntil = 0;
+let ytSeekWatch = null;
+let ytSeekRetried = false;
 // یوتیوب بعد از seekTo هنوز چند لحظه زمان قدیمی را گزارش می‌کند. تا وقتی
 // واقعاً نرسیده، همان مقصدی را که خواسته‌ایم گزارش می‌کنیم؛ وگرنه موقعیت
 // کهنه برای طرف مقابل ارسال می‌شود و او ما را به عقب برمی‌گرداند.
@@ -149,9 +150,11 @@ const ytAdapter = {
     get currentTime() {
         if (!ytReady || !ytPlayer.getCurrentTime) return 0;
         const actual = ytPlayer.getCurrentTime() || 0;
+        // تا وقتی جابه‌جایی واقعاً ننشسته، مقصد را گزارش می‌کنیم نه موقعیت کهنه را.
+        // مهلت زمانی نداریم: جابه‌جایی رو به جلو یعنی دانلود، و روی اینترنت کند
+        // ممکن است ده‌ها ثانیه طول بکشد. مراقب جداگانه‌ای جلوی گیر ابدی را می‌گیرد.
         if (ytSeekTarget !== null) {
-            if (Math.abs(actual - ytSeekTarget) < 0.8) ytSeekTarget = null;  // رسید
-            else if (!ytSeeking()) ytSeekTarget = null;                      // مهلت تمام شد
+            if (Math.abs(actual - ytSeekTarget) < YT_SEEK_LANDED) ytSeekTarget = null;
             else return ytSeekTarget;
         }
         return actual;
@@ -159,9 +162,10 @@ const ytAdapter = {
     set currentTime(t) {
         if (!ytReady) return;
         ytSeekTarget = t;
+        ytSeekRetried = false;
         ytSuppress(2600);
-        ytSeekUntil = performance.now() + 5000;
         ytPlayer.seekTo(t, true);
+        watchYtSeek();
     },
     get paused() {
         if (!ytReady) return true;
@@ -185,13 +189,37 @@ const ytAdapter = {
 
 function P() { return state.mode === 'youtube' ? ytAdapter : html5Adapter; }
 
+const YT_SEEK_LANDED = 1.0;      // ثانیه: این‌قدر نزدیک شد یعنی رسید
+const YT_SEEK_PATIENCE = 8000;   // میلی‌ثانیه: بعد از این یک‌بار دوباره تلاش می‌کنیم
+
 function ytSuppress(ms) { ytSuppressUntil = Math.max(ytSuppressUntil, performance.now() + ms); }
 function ytSuppressed() { return performance.now() < ytSuppressUntil; }
-function ytSeeking() { return performance.now() < ytSeekUntil; }
+function ytSeeking() { return ytSeekTarget !== null; }
 
-// تا وقتی جابه‌جایی روی این دستگاه کامل نشده، موقعیتش قابل اتکا نیست
+// اگر یوتیوب جابه‌جایی را انجام نداد، یک‌بار دوباره می‌خواهیم و بعد رها می‌کنیم؛
+// وگرنه پلیر تا ابد مقصدی را گزارش می‌کند که هرگز به آن نرسیده.
+function watchYtSeek() {
+    clearTimeout(ytSeekWatch);
+    if (ytSeekTarget === null) return;
+    ytSeekWatch = setTimeout(() => {
+        if (ytSeekTarget === null || !ytReady) return;
+        const actual = ytPlayer.getCurrentTime() || 0;
+        if (Math.abs(actual - ytSeekTarget) < YT_SEEK_LANDED) { ytSeekTarget = null; return; }
+        if (!ytSeekRetried) {
+            ytSeekRetried = true;
+            ytPlayer.seekTo(ytSeekTarget, true);
+            watchYtSeek();
+            return;
+        }
+        ytSeekTarget = null;
+        playerToast('یوتیوب نتوانست به آن نقطه برود');
+    }, YT_SEEK_PATIENCE);
+}
+
+// تا وقتی جابه‌جایی روی این دستگاه کامل نشده، موقعیتش قابل اتکا نیست و
+// نباید پخش شود، وگرنه طرف مقابلِ درست را به عقب می‌کشد.
 function seekPending() {
-    return state.mode === 'youtube' ? (ytSeekTarget !== null && ytSeeking()) : el.video.seeking;
+    return state.mode === 'youtube' ? ytSeeking() : el.video.seeking;
 }
 
 // ------------------------------------------------------------
@@ -797,8 +825,9 @@ async function loadYouTube(videoId, share) {
 
     if (ytPlayer && ytPlayer.destroy) { ytPlayer.destroy(); ytPlayer = null; ytReady = false; }
     ytSeekTarget = null;
-    ytSeekUntil = 0;
+    ytSeekRetried = false;
     ytSuppressUntil = 0;
+    clearTimeout(ytSeekWatch);
     const host = document.createElement('div');
     host.id = 'yt-frame';
     el.ytHost.innerHTML = '';
@@ -847,9 +876,9 @@ async function loadYouTube(videoId, share) {
                 }
                 if (st !== 1 && st !== 2) return;
 
-                // ytSeekUntil عمداً پاک نمی‌شود؛ خودش منقضی می‌شود. یوتیوب وسط
-                // یک جابه‌جایی هم وضعیت «مکث» می‌فرستد و پاک کردن زودهنگام آن
-                // باعث می‌شود تیک بعدی دوباره جابه‌جا کند.
+                // مقصد جابه‌جایی عمداً اینجا پاک نمی‌شود؛ فقط وقتی پاک می‌شود که
+                // پلیر واقعاً به آن رسیده باشد. یوتیوب وسط یک جابه‌جایی هم وضعیت
+                // «مکث» می‌فرستد و پاک کردن زودهنگام، تیک بعدی را گمراه می‌کند.
                 noteReady();
 
                 // اگر این تغییر نتیجهٔ دستور خودمان بود، دوباره پخشش نکن
