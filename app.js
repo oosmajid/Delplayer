@@ -111,6 +111,11 @@ const state = {
 // ------------------------------------------------------------
 let ytPlayer = null;
 let ytReady = false;
+// یوتیوب برای یک جابه‌جایی، زنجیره‌ای از رویدادها می‌فرستد (مکث، بافر، پخش).
+// بدون این دو پنجره، هر دستوری که خودمان دادیم دوباره برای طرف مقابل ارسال
+// می‌شود و دو طرف بی‌وقفه همدیگر را متوقف و پخش می‌کنند.
+let ytSuppressUntil = 0;
+let ytSeekUntil = 0;
 let ytApiLoading = null;
 
 const html5Adapter = {
@@ -138,8 +143,18 @@ const html5Adapter = {
 const ytAdapter = {
     get duration() { return ytReady && ytPlayer.getDuration ? ytPlayer.getDuration() || 0 : 0; },
     get currentTime() { return ytReady && ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() || 0 : 0; },
-    set currentTime(t) { if (ytReady) ytPlayer.seekTo(t, true); },
-    get paused() { return !ytReady || ytPlayer.getPlayerState() !== 1; },
+    set currentTime(t) {
+        if (!ytReady) return;
+        ytSuppress(2600);
+        ytSeekUntil = performance.now() + 2600;
+        ytPlayer.seekTo(t, true);
+    },
+    get paused() {
+        if (!ytReady) return true;
+        const st = ytPlayer.getPlayerState();
+        // ۳ = بافر شدن. یعنی دارد پخش می‌شود ولی داده ندارد، نه اینکه مکث شده
+        return st !== 1 && st !== 3;
+    },
     get rate() { return ytReady && ytPlayer.getPlaybackRate ? ytPlayer.getPlaybackRate() : 1; },
     set rate(r) { if (ytReady) ytPlayer.setPlaybackRate(r); },
     get volume() { return ytReady && ytPlayer.getVolume ? ytPlayer.getVolume() / 100 : 1; },
@@ -150,11 +165,15 @@ const ytAdapter = {
         if (!ytReady || !ytPlayer.getVideoLoadedFraction) return 0;
         return ytPlayer.getVideoLoadedFraction() * (ytPlayer.getDuration() || 0);
     },
-    play() { if (ytReady) ytPlayer.playVideo(); return Promise.resolve(); },
-    pause() { if (ytReady) ytPlayer.pauseVideo(); }
+    play() { if (ytReady) { ytSuppress(1600); ytPlayer.playVideo(); } return Promise.resolve(); },
+    pause() { if (ytReady) { ytSuppress(1600); ytPlayer.pauseVideo(); } }
 };
 
 function P() { return state.mode === 'youtube' ? ytAdapter : html5Adapter; }
+
+function ytSuppress(ms) { ytSuppressUntil = Math.max(ytSuppressUntil, performance.now() + ms); }
+function ytSuppressed() { return performance.now() < ytSuppressUntil; }
+function ytSeeking() { return performance.now() < ytSeekUntil; }
 
 // ------------------------------------------------------------
 // سرکوب اکو: رویدادهایی که خودمان به‌خاطر دستور طرف مقابل ساختیم
@@ -360,7 +379,7 @@ function applyRemoteControl(s) {
     }
 
     const target = targetTimeFrom(s);
-    if (Math.abs(p.currentTime - target) > 0.35) {
+    if (Math.abs(p.currentTime - target) > (state.mode === 'youtube' ? 0.9 : 0.35)) {
         expectEvent('seeked', 4000);
         p.currentTime = target;
     }
@@ -382,10 +401,15 @@ function applyRemoteTick(s) {
     if (!s.playing || p.paused) return;
     if (!amFollower()) return;          // فقط دنبال‌کننده خودش را تنظیم می‌کند
     if (state.localStalled || state.peerStalled) return;
+    // getCurrentTime یوتیوب بلافاصله بعد از جابه‌جایی هنوز عدد قدیمی می‌دهد؛
+    // بدون این، هر تیک یک جابه‌جایی تازه می‌سازد و پخش مدام می‌پرد.
+    if (state.mode === 'youtube' && ytSeeking()) return;
 
     const diff = targetTimeFrom(s) - p.currentTime;
 
-    if (Math.abs(diff) > HARD_SEEK_THRESHOLD) {
+    // آستانهٔ یوتیوب بازتر است چون گزارش زمانش دقیق نیست
+    const seekThreshold = state.mode === 'youtube' ? 2.5 : HARD_SEEK_THRESHOLD;
+    if (Math.abs(diff) > seekThreshold) {
         expectEvent('seeked', 4000);
         p.currentTime = p.currentTime + diff;
         clearNudge();
@@ -445,9 +469,11 @@ let stallTimer = null;
 // وقفهٔ ناشی از جابه‌جایی، بافر نیست. وقفهٔ خیلی کوتاه هم ارزش متوقف کردن
 // طرف مقابل را ندارد، وگرنه پخش هر چند لحظه تکان می‌خورد.
 function noteWaiting() {
-    if (!state.wantPlaying || el.video.seeking) return;
+    if (!state.wantPlaying) return;
+    if (state.mode === 'youtube' ? ytSeeking() : el.video.seeking) return;
     clearTimeout(stallTimer);
-    stallTimer = setTimeout(() => setLocalStalled(true), 450);
+    // یوتیوب بسیار بیشتر از ویدیوی محلی بافر می‌کند، پس صبر بیشتری لازم دارد
+    stallTimer = setTimeout(() => setLocalStalled(true), state.mode === 'youtube' ? 1200 : 450);
 }
 function noteReady() {
     clearTimeout(stallTimer);
@@ -531,6 +557,10 @@ function handleSignal(data, from) {
     switch (data.type) {
         case 'request_source':
             sendSourceInfo();
+            break;
+
+        case 'request_state':
+            sendControl('sync');
             break;
 
         case 'source':
@@ -751,29 +781,63 @@ async function loadYouTube(videoId, share) {
     el.ytHost.innerHTML = '';
     el.ytHost.appendChild(host);
 
+    // اگر API یوتیوب جواب نداد، کاربر نباید جلوی صفحهٔ سیاه بماند
+    const ytReadyTimeout = setTimeout(() => {
+        if (!ytReady) setStatus('پخش‌کنندهٔ یوتیوب پاسخ نداد. اتصال یا فیلترشکن را بررسی کنید.', 'error');
+    }, 15000);
+
     ytPlayer = new YT.Player('yt-frame', {
         videoId: videoId,
-        playerVars: { playsinline: 1, controls: 0, rel: 0, modestbranding: 1, disablekb: 1, iv_load_policy: 3 },
+        host: 'https://www.youtube.com',
+        playerVars: {
+            playsinline: 1, controls: 0, rel: 0, modestbranding: 1,
+            disablekb: 1, iv_load_policy: 3,
+            enablejsapi: 1,
+            origin: location.origin
+        },
         events: {
+            onError: (e) => {
+                const why = { 2: 'شناسهٔ ویدیو نامعتبر است', 5: 'این ویدیو در پخش‌کنندهٔ وب پخش نمی‌شود',
+                              100: 'ویدیو پیدا نشد یا حذف شده', 101: 'صاحب ویدیو اجازهٔ پخش در سایت دیگر را نداده',
+                              150: 'صاحب ویدیو اجازهٔ پخش در سایت دیگر را نداده' }[e.data];
+                setStatus(why || 'خطا در پخش ویدیوی یوتیوب', 'error');
+                playerToast(why || 'این ویدیوی یوتیوب پخش نشد');
+            },
             onReady: () => {
                 ytReady = true;
+                clearTimeout(ytReadyTimeout);
                 setStatus('پخش‌کنندهٔ یوتیوب آماده است', 'success');
                 el.volume.value = ytAdapter.volume;
-                if (state.connected) sendControl('sync');
+                if (!state.connected) return;
+                // اگر ویدیو را طرف مقابل باز کرده، وضعیت او مرجع است؛ وگرنه ما
+                // تازه بارگذاری کرده‌ایم و وضعیت خودمان را اعلام می‌کنیم.
+                if (share) sendControl('sync');
+                else toPartner({ type: 'request_state' });
             },
             onStateChange: (e) => {
                 if (!ytReady) return;
-                // 3 = buffering
-                setLocalStalled(e.data === 3 && state.wantPlaying);
-                if (e.data === 1 || e.data === 2) {
-                    const playing = e.data === 1;
-                    const wasExpected = consumeExpected(playing ? 'play' : 'pause');
-                    if (!wasExpected) {
+                const st = e.data;   // 1=پخش 2=مکث 3=بافر
+
+                if (st === 3) {
+                    noteWaiting();
+                    return;
+                }
+                if (st !== 1 && st !== 2) return;
+
+                // ytSeekUntil عمداً پاک نمی‌شود؛ خودش منقضی می‌شود. یوتیوب وسط
+                // یک جابه‌جایی هم وضعیت «مکث» می‌فرستد و پاک کردن زودهنگام آن
+                // باعث می‌شود تیک بعدی دوباره جابه‌جا کند.
+                noteReady();
+
+                // اگر این تغییر نتیجهٔ دستور خودمان بود، دوباره پخشش نکن
+                if (!ytSuppressed()) {
+                    const playing = st === 1;
+                    if (state.wantPlaying !== playing) {
                         state.wantPlaying = playing;
                         sendControl(playing ? 'play' : 'pause');
                     }
-                    updatePlayIcon();
                 }
+                updatePlayIcon();
             }
         }
     });
