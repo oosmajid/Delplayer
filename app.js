@@ -116,6 +116,10 @@ let ytReady = false;
 // می‌شود و دو طرف بی‌وقفه همدیگر را متوقف و پخش می‌کنند.
 let ytSuppressUntil = 0;
 let ytSeekUntil = 0;
+// یوتیوب بعد از seekTo هنوز چند لحظه زمان قدیمی را گزارش می‌کند. تا وقتی
+// واقعاً نرسیده، همان مقصدی را که خواسته‌ایم گزارش می‌کنیم؛ وگرنه موقعیت
+// کهنه برای طرف مقابل ارسال می‌شود و او ما را به عقب برمی‌گرداند.
+let ytSeekTarget = null;
 let ytApiLoading = null;
 
 const html5Adapter = {
@@ -142,11 +146,21 @@ const html5Adapter = {
 
 const ytAdapter = {
     get duration() { return ytReady && ytPlayer.getDuration ? ytPlayer.getDuration() || 0 : 0; },
-    get currentTime() { return ytReady && ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() || 0 : 0; },
+    get currentTime() {
+        if (!ytReady || !ytPlayer.getCurrentTime) return 0;
+        const actual = ytPlayer.getCurrentTime() || 0;
+        if (ytSeekTarget !== null) {
+            if (Math.abs(actual - ytSeekTarget) < 0.8) ytSeekTarget = null;  // رسید
+            else if (!ytSeeking()) ytSeekTarget = null;                      // مهلت تمام شد
+            else return ytSeekTarget;
+        }
+        return actual;
+    },
     set currentTime(t) {
         if (!ytReady) return;
+        ytSeekTarget = t;
         ytSuppress(2600);
-        ytSeekUntil = performance.now() + 2600;
+        ytSeekUntil = performance.now() + 5000;
         ytPlayer.seekTo(t, true);
     },
     get paused() {
@@ -174,6 +188,11 @@ function P() { return state.mode === 'youtube' ? ytAdapter : html5Adapter; }
 function ytSuppress(ms) { ytSuppressUntil = Math.max(ytSuppressUntil, performance.now() + ms); }
 function ytSuppressed() { return performance.now() < ytSuppressUntil; }
 function ytSeeking() { return performance.now() < ytSeekUntil; }
+
+// تا وقتی جابه‌جایی روی این دستگاه کامل نشده، موقعیتش قابل اتکا نیست
+function seekPending() {
+    return state.mode === 'youtube' ? (ytSeekTarget !== null && ytSeeking()) : el.video.seeking;
+}
 
 // ------------------------------------------------------------
 // سرکوب اکو: رویدادهایی که خودمان به‌خاطر دستور طرف مقابل ساختیم
@@ -341,6 +360,7 @@ function startTicker() {
         if (!state.connected || !state.hasMedia) return;
         const p = P();
         if (p.paused) return;
+        if (seekPending()) return;
         const s = localState();
         s.type = 'tick';
         toPartner(s);
@@ -776,6 +796,9 @@ async function loadYouTube(videoId, share) {
     await loadYouTubeApi();
 
     if (ytPlayer && ytPlayer.destroy) { ytPlayer.destroy(); ytPlayer = null; ytReady = false; }
+    ytSeekTarget = null;
+    ytSeekUntil = 0;
+    ytSuppressUntil = 0;
     const host = document.createElement('div');
     host.id = 'yt-frame';
     el.ytHost.innerHTML = '';
@@ -1117,6 +1140,8 @@ function seekTo(t) {
     if (!state.hasMedia) return;
     const p = P();
     const d = p.duration || 0;
+    // رویداد seeked خودش هم می‌خواهد این را بفرستد؛ یک‌بار کافی است
+    expectEvent('seeked', 4000);
     p.currentTime = clamp(t, 0, d ? d - 0.15 : t);
     clearNudge();
     sendControl('seek');
