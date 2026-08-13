@@ -109,7 +109,11 @@
                     <span id="my-id-text">…</span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
-                <span class="copied" id="copied-hint">کپی شد</span>
+                <button type="button" class="invite-btn" id="invite-link" title="کپی لینک دعوت">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"></path></svg>
+                    <span>کپی لینک دعوت</span>
+                </button>
+                <span class="copied" id="copied-hint" aria-live="polite">کپی شد</span>
             </div>
 
             <div class="connect-actions">
@@ -143,6 +147,8 @@
             <div class="subs" id="subs" aria-live="off"></div>
 
             <div class="overlay-chat" id="overlay-chat" aria-hidden="true"></div>
+
+            <div class="reaction-layer" id="reaction-layer" aria-hidden="true"></div>
 
             <div class="overlay-input" id="overlay-input">
                 <input type="text" id="overlay-chat-input" placeholder="پیام… و Enter" maxlength="500" autocomplete="off">
@@ -199,6 +205,19 @@
                     <button class="ctl" id="btn-chat" type="button" aria-label="چت روی تصویر" title="چت روی تصویر (کلید C)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.4A8.4 8.4 0 0 1 3.6 11.5a8.4 8.4 0 0 1 8.4-8.4 8.4 8.4 0 0 1 9 8.4z"></path></svg>
                     </button>
+
+                    <div class="menu-wrap reaction-wrap">
+                        <button class="ctl" id="btn-reactions" type="button" aria-label="واکنش سریع" aria-haspopup="true" aria-expanded="false" title="واکنش سریع">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path><path d="M18.5 2v4M16.5 4h4"></path></svg>
+                        </button>
+                        <div class="menu reaction-menu" id="reaction-menu" role="menu" aria-label="واکنش‌های سریع">
+                            <div class="reaction-menu-head">
+                                <span>حست رو بفرست</span>
+                                <small>برای هر دو نفر نمایش داده می‌شود</small>
+                            </div>
+                            <div class="reaction-grid" id="reaction-items"></div>
+                        </div>
+                    </div>
 
                     <div class="menu-wrap">
                         <button class="ctl" id="btn-subs" type="button" aria-label="زیرنویس" aria-haspopup="true" aria-expanded="false" title="زیرنویس (کلید S)">
@@ -314,6 +333,20 @@
                 </span>
                 <h3>چت روی تصویر</h3>
                 <p>پیام‌ها گوشهٔ تصویر ظاهر و بعد از چند ثانیه محو می‌شوند، حتی در حالت تمام‌صفحه.</p>
+            </article>
+            <article class="feature">
+                <span class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"></path><path d="M18.5 2v4M16.5 4h4"></path></svg>
+                </span>
+                <h3>واکنش‌های زنده</h3>
+                <p>با ۱۰ واکنش سریع و متحرک، حس همان لحظه‌تان را بدون توقف فیلم برای دوستتان بفرستید.</p>
+            </article>
+            <article class="feature">
+                <span class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"></path></svg>
+                </span>
+                <h3>دعوت با یک لینک</h3>
+                <p>لینک دعوت را کپی کنید؛ دوستتان با باز کردن آن بدون وارد کردن شناسه به شما متصل می‌شود.</p>
             </article>
             <article class="feature">
                 <span class="feature-icon">

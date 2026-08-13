@@ -182,6 +182,17 @@ a{color:var(--accent);text-underline-offset:3px}
 }
 .id-chip:hover{border-color:var(--accent-2)}
 .id-chip svg{width:.95rem;height:.95rem;opacity:.6}
+.invite-btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  min-height:2.15rem;padding:.32rem .72rem;
+  color:var(--text);background:rgba(240,137,122,.1);
+  border:1px solid rgba(240,137,122,.3);border-radius:var(--r-sm);
+  font:inherit;font-size:.8rem;font-weight:500;cursor:pointer;
+  transition:background .18s,border-color .18s,color .18s,transform .18s cubic-bezier(.22,1,.36,1);
+}
+.invite-btn:hover{background:rgba(240,137,122,.18);border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+.invite-btn:active{transform:translateY(0)}
+.invite-btn svg{width:1rem;height:1rem;flex:0 0 auto}
 .copied{color:var(--ok);font-size:.8rem;opacity:0;transition:opacity .2s}
 .copied.show{opacity:1}
 
@@ -313,6 +324,49 @@ a{color:var(--accent);text-underline-offset:3px}
 @keyframes ovIn{from{opacity:0;transform:translateY(var(--enter)) scale(.96)}to{opacity:1;transform:none}}
 @keyframes ovOut{to{opacity:0;transform:translateY(-6px) scale(.98);margin-bottom:-2.2rem}}
 
+/* ---------- واکنش‌های سریع روی تصویر ---------- */
+.reaction-layer{position:absolute;inset:0;z-index:9;overflow:hidden;pointer-events:none}
+.reaction-burst{
+  --x:50%;--drift:0px;--tilt:0deg;
+  position:absolute;left:var(--x);bottom:4.7rem;
+  display:grid;justify-items:center;gap:.15rem;
+  filter:drop-shadow(0 12px 18px rgba(0,0,0,.48));
+  animation:reactionFlight 2.45s cubic-bezier(.16,.78,.22,1) both;
+}
+.reaction-emoji{
+  position:relative;z-index:2;display:block;
+  font-size:clamp(2.9rem,7vw,5.2rem);line-height:1;
+  animation:reactionPop .48s cubic-bezier(.18,1.55,.35,1) both;
+}
+.reaction-from{
+  position:relative;z-index:3;
+  padding:.08rem .45rem;border-radius:99px;
+  background:rgba(20,12,16,.74);border:1px solid rgba(255,255,255,.18);
+  color:#fff;font-size:.62rem;font-weight:500;line-height:1.5;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.reaction-burst.mine .reaction-from{background:rgba(240,137,122,.88);color:var(--accent-ink);border-color:rgba(255,255,255,.25)}
+.reaction-spark{
+  position:absolute;left:50%;top:36%;z-index:1;
+  color:var(--accent-2);font-size:clamp(.6rem,1.5vw,1rem);line-height:1;
+  animation:reactionSpark 1s ease-out both;animation-delay:var(--delay);
+}
+@keyframes reactionPop{
+  0%{transform:scale(.25) rotate(-14deg);opacity:0}
+  68%{transform:scale(1.18) rotate(5deg);opacity:1}
+  100%{transform:scale(1) rotate(0)}
+}
+@keyframes reactionFlight{
+  0%{opacity:0;transform:translate3d(-50%,24px,0) rotate(0) scale(.82)}
+  12%,72%{opacity:1}
+  100%{opacity:0;transform:translate3d(calc(-50% + var(--drift)),-12rem,0) rotate(var(--tilt)) scale(1.06)}
+}
+@keyframes reactionSpark{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
+  25%{opacity:1}
+  100%{opacity:0;transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy))) scale(1.15) rotate(90deg)}
+}
+
 /* ورودی چت داخل پلیر: سمت راست، مقابل جایی که پیام‌ها ظاهر می‌شوند */
 .overlay-input{
   position:absolute;right:1rem;left:auto;bottom:5.5rem;z-index:9;
@@ -437,6 +491,44 @@ a{color:var(--accent);text-underline-offset:3px}
 .menu-item[aria-checked="true"]{color:var(--accent)}
 .menu-item[aria-checked="true"] .check{opacity:1}
 .menu-item .sub{color:var(--faint);font-size:.72rem;margin-right:auto;font-family:var(--mono);direction:ltr}
+
+.reaction-menu{
+  left:-.5rem;right:auto;width:min(19rem,calc(100vw - 1.5rem));max-height:none;
+  padding:.65rem;transform:translateY(8px) scale(.97);transform-origin:bottom left;
+  background:linear-gradient(145deg,rgba(43,27,36,.98),rgba(25,16,21,.98));
+  border-color:rgba(240,137,122,.32);
+}
+.reaction-menu.open{transform:none}
+.reaction-menu-head{display:grid;gap:.05rem;padding:.05rem .15rem .55rem;border-bottom:1px solid var(--line-soft);margin-bottom:.55rem}
+.reaction-menu-head span{font-size:.82rem;font-weight:700;color:var(--text)}
+.reaction-menu-head small{font-size:.66rem;color:var(--faint)}
+.reaction-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;direction:ltr}
+.reaction-choice{
+  position:relative;display:grid;place-items:center;aspect-ratio:1;
+  min-width:0;padding:0;border-radius:12px;
+  background:rgba(248,237,233,.045);border:1px solid rgba(248,237,233,.07);
+  font-size:1.55rem;line-height:1;cursor:pointer;
+  transition:transform .16s cubic-bezier(.22,1,.36,1),background .16s,border-color .16s,box-shadow .16s;
+}
+.reaction-choice:hover,.reaction-choice:focus-visible{
+  transform:translateY(-3px) scale(1.08);background:rgba(240,137,122,.15);
+  border-color:rgba(240,137,122,.4);box-shadow:0 10px 20px -12px rgba(240,137,122,.85);
+}
+.reaction-choice.sent{animation:reactionChoice .35s cubic-bezier(.18,1.55,.35,1)}
+@keyframes reactionChoice{50%{transform:scale(1.25)}}
+@media (max-width:520px){
+  .invite-btn span{display:none}
+  .invite-btn{width:2.15rem;padding:0;justify-content:center}
+  .controls{padding-left:.45rem;padding-right:.45rem}
+  .ctl{width:2rem;height:2rem}
+  .time{display:none}
+  .reaction-menu{left:-1.1rem;width:min(15rem,calc(100vw - 1rem));padding:.45rem}
+  .reaction-menu-head{padding:0 .1rem .3rem;margin-bottom:.35rem}
+  .reaction-menu-head span{font-size:.74rem}
+  .reaction-menu-head small{display:none}
+  .reaction-grid{gap:.2rem}
+  .reaction-choice{font-size:1.2rem;border-radius:9px}
+}
 
 /* نوار پیشرفت استخراج زیرنویس */
 .subs-scan{

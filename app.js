@@ -56,9 +56,12 @@ const el = {
 
     videoUrl: $('video-url'), loadUrl: $('load-url'),
     videoFile: $('video-file'), videoDrop: $('video-drop'), subtitleFile: $('subtitle-file'),
-    myIdBtn: $('my-id'), myIdText: $('my-id-text'), copiedHint: $('copied-hint'),
+    myIdBtn: $('my-id'), myIdText: $('my-id-text'), inviteLink: $('invite-link'), copiedHint: $('copied-hint'),
     partnerId: $('partner-id'), connectBtn: $('connect-btn'), disconnectBtn: $('disconnect-btn'),
     lengthWarning: $('length-warning'),
+
+    btnReactions: $('btn-reactions'), reactionMenu: $('reaction-menu'),
+    reactionItems: $('reaction-items'), reactionLayer: $('reaction-layer'),
 
     stage: $('stage'), chatPanel: $('chat-panel'), chatLog: $('chat-log'),
     chatInput: $('chat-input'), chatSend: $('chat-send'),
@@ -70,6 +73,20 @@ const el = {
 };
 
 const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function validId(value) {
+    return typeof value === 'string' && value.length === 7 &&
+        value.split('').every((c) => ID_ALPHABET.indexOf(c) !== -1);
+}
+
+function inviteIdFromUrl() {
+    try {
+        const value = new URL(location.href).searchParams.get('invite');
+        return validId(value) ? value : '';
+    } catch (e) { return ''; }
+}
+
+let pendingInviteId = inviteIdFromUrl();
 
 // جلسه در sessionStorage نگه داشته می‌شود تا یک رفرش تصادفی، تماشا را خراب نکند.
 const SESSION_KEY = 'delplayer:session';
@@ -264,7 +281,19 @@ function connectWebSocket() {
             state.myId = msg.id;
             el.myIdText.textContent = msg.id;
             saveSession();
-            if (state.partnerId) {
+            if (pendingInviteId) {
+                const inviteId = pendingInviteId;
+                pendingInviteId = '';
+                clearInviteFromUrl();
+                if (inviteId === state.myId) {
+                    setStatus('این لینک دعوت متعلق به خودتان است', 'error');
+                    return;
+                }
+                state.partnerId = '';
+                el.partnerId.value = inviteId;
+                setStatus('لینک دعوت باز شد؛ در حال اتصال به ' + inviteId + '…', 'connecting');
+                sendTo(inviteId, { type: 'connect_request' });
+            } else if (state.partnerId) {
                 state.peerUnstable = true;
                 setStatus('اتصال با سرور برقرار شد، در حال اتصال دوباره به ' + state.partnerId + '…', 'connecting');
                 // ممکن است سرور شناسهٔ تازه‌ای داده باشد؛ شناسهٔ قبلی را هم می‌فرستیم
@@ -643,6 +672,10 @@ function handleSignal(data, from) {
 
         case 'chat':
             receiveChat(data.msg);
+            break;
+
+        case 'reaction':
+            receiveReaction(data.emoji);
             break;
 
         case 'disconnect':
@@ -1279,8 +1312,10 @@ function updateVolumeUi() {
 function closeMenus() {
     el.subsMenu.classList.remove('open');
     el.rateMenu.classList.remove('open');
+    el.reactionMenu.classList.remove('open');
     el.btnSubs.setAttribute('aria-expanded', 'false');
     el.btnRate.setAttribute('aria-expanded', 'false');
+    el.btnReactions.setAttribute('aria-expanded', 'false');
 }
 function toggleMenu(menu, btn) {
     const open = menu.classList.contains('open');
@@ -1292,6 +1327,12 @@ function toggleMenu(menu, btn) {
 }
 el.btnSubs.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(el.subsMenu, el.btnSubs); });
 el.btnRate.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(el.rateMenu, el.btnRate); });
+el.btnReactions.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!state.connected) { playerToast('برای فرستادن واکنش ابتدا متصل شوید'); return; }
+    toggleMenu(el.reactionMenu, el.btnReactions);
+    wakeControls();
+});
 document.addEventListener('click', (e) => { if (!e.target.closest('.menu-wrap')) closeMenus(); });
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -1351,7 +1392,7 @@ function wakeControls() {
     idleTimer = setTimeout(() => {
         if (!state.hasMedia || P().paused) return;
         if (el.player.classList.contains('chat-open')) return;
-        if (el.subsMenu.classList.contains('open') || el.rateMenu.classList.contains('open')) return;
+        if (el.subsMenu.classList.contains('open') || el.rateMenu.classList.contains('open') || el.reactionMenu.classList.contains('open')) return;
         el.player.classList.add('controls-hidden', 'is-idle');
     }, 2800);
 }
@@ -1406,6 +1447,93 @@ function cycleSubtitles() {
     selectTrack(ids[(i + 1) % ids.length]);
     const t = subTracks.find((x) => x.id === activeTrackId);
     playerToast(t ? 'زیرنویس: ' + t.label : 'زیرنویس خاموش');
+}
+
+// ------------------------------------------------------------
+// واکنش‌های سریع
+// ------------------------------------------------------------
+const QUICK_REACTIONS = [
+    { emoji: '❤️', label: 'عاشقش شدم' },
+    { emoji: '😂', label: 'خیلی خنده‌دار' },
+    { emoji: '😍', label: 'فوق‌العاده‌ست' },
+    { emoji: '😮', label: 'وااای' },
+    { emoji: '😭', label: 'گریه‌ام گرفت' },
+    { emoji: '😱', label: 'ترسیدم' },
+    { emoji: '🔥', label: 'ترکوند' },
+    { emoji: '👏', label: 'آفرین' },
+    { emoji: '🍿', label: 'چه فیلمی' },
+    { emoji: '🤯', label: 'ذهنم منفجر شد' }
+];
+const QUICK_REACTION_SET = new Set(QUICK_REACTIONS.map((item) => item.emoji));
+let lastReactionAt = 0;
+
+function renderQuickReactions() {
+    el.reactionItems.innerHTML = '';
+    QUICK_REACTIONS.forEach((item) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reaction-choice';
+        button.textContent = item.emoji;
+        button.title = item.label;
+        button.setAttribute('role', 'menuitem');
+        button.setAttribute('aria-label', item.label + ' ' + item.emoji);
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            sendReaction(item.emoji);
+            button.classList.remove('sent');
+            requestAnimationFrame(() => button.classList.add('sent'));
+            setTimeout(() => button.classList.remove('sent'), 400);
+            wakeControls();
+        });
+        el.reactionItems.appendChild(button);
+    });
+}
+
+function sendReaction(emoji) {
+    if (!state.connected || !QUICK_REACTION_SET.has(emoji)) return;
+    const now = Date.now();
+    if (now - lastReactionAt < 180) return;
+    lastReactionAt = now;
+    showReaction(emoji, true);
+    toPartner({ type: 'reaction', emoji: emoji });
+}
+
+function receiveReaction(emoji) {
+    if (!QUICK_REACTION_SET.has(emoji)) return;
+    showReaction(emoji, false);
+}
+
+function showReaction(emoji, mine) {
+    const burst = document.createElement('div');
+    burst.className = 'reaction-burst' + (mine ? ' mine' : '');
+    burst.style.setProperty('--x', (28 + Math.random() * 44).toFixed(1) + '%');
+    burst.style.setProperty('--drift', ((Math.random() - 0.5) * 110).toFixed(0) + 'px');
+    burst.style.setProperty('--tilt', ((Math.random() - 0.5) * 18).toFixed(1) + 'deg');
+
+    const icon = document.createElement('span');
+    icon.className = 'reaction-emoji';
+    icon.textContent = emoji;
+    burst.appendChild(icon);
+
+    const who = document.createElement('span');
+    who.className = 'reaction-from';
+    who.textContent = mine ? 'تو' : 'دوستت';
+    burst.appendChild(who);
+
+    const sparks = [[-48, -38], [46, -30], [-58, 20], [58, 14], [-22, 48], [28, 46]];
+    sparks.forEach((point, index) => {
+        const spark = document.createElement('i');
+        spark.className = 'reaction-spark';
+        spark.textContent = index % 2 ? '•' : '✦';
+        spark.style.setProperty('--sx', point[0] + 'px');
+        spark.style.setProperty('--sy', point[1] + 'px');
+        spark.style.setProperty('--delay', (index * 0.035) + 's');
+        burst.appendChild(spark);
+    });
+
+    el.reactionLayer.appendChild(burst);
+    while (el.reactionLayer.children.length > 12) el.reactionLayer.removeChild(el.reactionLayer.firstChild);
+    setTimeout(() => burst.remove(), prefersReducedMotion ? 300 : 2600);
 }
 
 // ------------------------------------------------------------
@@ -1823,21 +1951,57 @@ document.addEventListener('drop', (e) => {
     else loadFile(file);
 });
 
-el.myIdBtn.addEventListener('click', async () => {
-    if (!state.myId) return;
+async function copyText(value) {
     try {
-        await navigator.clipboard.writeText(state.myId);
+        await navigator.clipboard.writeText(value);
+        return true;
     } catch (e) {
         const ta = document.createElement('textarea');
-        ta.value = state.myId;
+        ta.value = value;
         ta.style.cssText = 'position:fixed;left:-9999px';
         document.body.appendChild(ta);
         ta.select();
-        try { document.execCommand('copy'); } catch (e2) {}
+        let copied = false;
+        try { copied = document.execCommand('copy'); } catch (e2) {}
         ta.remove();
+        return copied;
     }
+}
+
+function showCopiedHint(message) {
+    el.copiedHint.textContent = message;
     el.copiedHint.classList.add('show');
-    setTimeout(() => el.copiedHint.classList.remove('show'), 1800);
+    clearTimeout(showCopiedHint._t);
+    showCopiedHint._t = setTimeout(() => el.copiedHint.classList.remove('show'), 1800);
+}
+
+function inviteUrl() {
+    const url = new URL(location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('invite', state.myId);
+    return url.href;
+}
+
+function clearInviteFromUrl() {
+    try {
+        const url = new URL(location.href);
+        if (!url.searchParams.has('invite')) return;
+        url.searchParams.delete('invite');
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+    } catch (e) {}
+}
+
+el.myIdBtn.addEventListener('click', async () => {
+    if (!state.myId) return;
+    if (await copyText(state.myId)) showCopiedHint('شناسه کپی شد');
+    else setStatus('کپی خودکار ممکن نبود؛ شناسه را دستی کپی کنید', 'error');
+});
+
+el.inviteLink.addEventListener('click', async () => {
+    if (!state.myId) { setStatus('هنوز به سرور متصل نشده‌اید', 'error'); return; }
+    if (await copyText(inviteUrl())) showCopiedHint('لینک دعوت کپی شد');
+    else setStatus('کپی خودکار ممکن نبود؛ دوباره تلاش کنید', 'error');
 });
 
 el.connectBtn.addEventListener('click', () => {
@@ -1863,11 +2027,12 @@ el.disconnectBtn.addEventListener('click', () => {
 // ------------------------------------------------------------
 const saved = loadSession();
 if (saved.myId) state.myId = saved.myId;
-if (saved.partnerId) state.partnerId = saved.partnerId;
+if (saved.partnerId && !pendingInviteId) state.partnerId = saved.partnerId;
 
 setChatEnabled(false);
 renderRateMenu();
 renderSubsMenu();
+renderQuickReactions();
 updateVolumeUi();
 updatePlayIcon();
 setStatus('در حال اتصال به سرور…', 'connecting');
