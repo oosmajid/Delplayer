@@ -1480,6 +1480,7 @@ function renderQuickReactions() {
         button.addEventListener('click', (event) => {
             event.stopPropagation();
             sendReaction(item.emoji);
+            closeMenus();
             button.classList.remove('sent');
             requestAnimationFrame(() => button.classList.add('sent'));
             setTimeout(() => button.classList.remove('sent'), 400);
