@@ -43,6 +43,7 @@ const el = {
     player: $('player'), video: $('video'), ytHost: $('yt-host'),
     bigPlay: $('big-play'), controls: $('controls'),
     scrub: $('scrub'), scrubFill: $('scrub-fill'), scrubBuffer: $('scrub-buffer'), scrubTip: $('scrub-tip'),
+    scrubMarks: $('scrub-marks'),
     btnPlay: $('btn-play'), iconPlay: $('icon-play'), iconPause: $('icon-pause'),
     btnBack: $('btn-back'), btnFwd: $('btn-fwd'),
     btnMute: $('btn-mute'), iconVol: $('icon-vol'), iconMute: $('icon-mute'), volume: $('volume'),
@@ -59,6 +60,8 @@ const el = {
     myIdBtn: $('my-id'), myIdText: $('my-id-text'), inviteLink: $('invite-link'), copiedHint: $('copied-hint'),
     partnerId: $('partner-id'), connectBtn: $('connect-btn'), disconnectBtn: $('disconnect-btn'),
     lengthWarning: $('length-warning'),
+    queueAdd: $('queue-add'), queue: $('queue'), queueList: $('queue-list'),
+    queueCount: $('queue-count'), queueNext: $('queue-next'),
 
     btnReactions: $('btn-reactions'), reactionMenu: $('reaction-menu'),
     reactionItems: $('reaction-items'), reactionLayer: $('reaction-layer'),
@@ -67,6 +70,13 @@ const el = {
     chatInput: $('chat-input'), chatSend: $('chat-send'),
     replyPreview: $('reply-preview'), replyText: $('reply-text'), replyCancel: $('reply-cancel'),
     emojiBtn: $('emoji-btn'), dockToggle: $('dock-toggle'), toggleOverlay: $('toggle-overlay'),
+
+    callAudio: $('call-audio'), callVideo: $('call-video'),
+    callDock: $('call-dock'), callRemote: $('call-remote'), remoteVideo: $('remote-video'), localVideo: $('local-video'),
+    callState: $('call-state'), callRemoteMic: $('call-remote-mic'),
+    callMic: $('call-mic'), callCam: $('call-cam'), callHang: $('call-hang'),
+    callIncoming: $('call-incoming'), callIncomingTitle: $('call-incoming-title'),
+    callAcceptVideo: $('call-accept-video'), callAcceptAudio: $('call-accept-audio'), callDecline: $('call-decline'),
 
     statusFab: $('status-fab'), statusTip: $('status-tip'),
     fabIcons: { disconnected: $('fab-off'), connected: $('fab-on'), success: $('fab-on'), connecting: $('fab-wait'), error: $('fab-err') }
@@ -139,6 +149,7 @@ let ytSeekRetried = false;
 // کهنه برای طرف مقابل ارسال می‌شود و او ما را به عقب برمی‌گرداند.
 let ytSeekTarget = null;
 let ytApiLoading = null;
+let ytVideoId = null;
 
 const html5Adapter = {
     get duration() { const d = el.video.duration; return isFinite(d) ? d : 0; },
@@ -642,10 +653,13 @@ function handleSignal(data, from) {
 
         case 'source':
             state.partnerSource = data;
+            matchQueueToSource(data.kind === 'youtube' ? 'yt:' + data.videoId : data.url);
+            // هر دو طرف بعد از بارگذاری منبعشان را اعلام می‌کنند؛ اگر همین الان باز است
+            // دوباره بارگذاری نکن، وگرنه دو طرف مدام همدیگر را از نو بارگذاری می‌کنند.
             if (data.kind === 'youtube') {
-                loadYouTube(data.videoId, false);
+                if (!(state.mode === 'youtube' && ytVideoId === data.videoId)) loadYouTube(data.videoId, false);
             } else if (data.kind === 'url') {
-                loadUrl(data.url, false);
+                if (!(state.mode === 'html5' && currentSource.kind === 'url' && currentSource.url === data.url)) loadUrl(data.url, false);
             } else if (data.kind === 'file') {
                 state.partnerDuration = data.duration || null;
                 playerToast('دوستتان فایل «' + data.name + '» را باز کرده. همان فایل را انتخاب کنید.');
@@ -675,7 +689,20 @@ function handleSignal(data, from) {
             break;
 
         case 'reaction':
-            receiveReaction(data.emoji);
+            receiveReaction(data.emoji, data.t, data.src);
+            break;
+
+        case 'queue':
+            receiveQueue(data);
+            break;
+
+        case 'call_invite': case 'call_accept': case 'call_decline': case 'call_end':
+        case 'call_offer': case 'call_answer': case 'call_media':
+            handleCallSignal(data);
+            break;
+
+        case 'queue_play':
+            receiveQueuePlay(data);
             break;
 
         case 'disconnect':
@@ -698,6 +725,7 @@ function establishPair(id, message) {
     startHeartbeat();
     startTicker();
     saveSession();
+    announceQueue();
 }
 
 function resumePair(from) {
@@ -715,6 +743,7 @@ function resumePair(from) {
     startHeartbeat();
     startTicker();
     saveSession();
+    announceQueue();
 }
 
 function handlePeerLost(reason) {
@@ -729,6 +758,7 @@ function handlePeerLost(reason) {
 }
 
 function resetConnection(reason) {
+    endCall(false, 'تماس با قطع اتصال تمام شد');
     state.partnerId = '';
     state.connected = false;
     state.peerUnstable = false;
@@ -797,6 +827,7 @@ function loadUrl(url, share) {
     stopSubtitleScan();
     clearSubtitles();
     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    clearReactionMarks();
     currentSource = { kind: 'url', url: url, name: '', size: 0 };
     el.video.src = url;
     el.videoUrl.value = url;
@@ -811,6 +842,7 @@ function loadFile(file) {
     clearSubtitles();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = URL.createObjectURL(file);
+    clearReactionMarks();
     currentSource = { kind: 'file', url: '', name: file.name, size: file.size };
     el.video.src = objectUrl;
     el.videoUrl.value = '';
@@ -848,9 +880,11 @@ async function loadYouTube(videoId, share) {
     setMode('youtube');
     stopSubtitleScan();
     clearSubtitles();
+    clearReactionMarks();
     markHasMedia();
     setStatus('در حال بارگذاری ویدیوی یوتیوب…', 'connecting');
     el.videoUrl.value = 'https://www.youtube.com/watch?v=' + videoId;
+    ytVideoId = videoId;
     el.video.removeAttribute('src');
     el.video.load();
 
@@ -893,6 +927,8 @@ async function loadYouTube(videoId, share) {
                 clearTimeout(ytReadyTimeout);
                 setStatus('پخش‌کنندهٔ یوتیوب آماده است', 'success');
                 el.volume.value = ytAdapter.volume;
+                updateQueueTitleFromYouTube(videoId);
+                if (runPendingAutoplay()) return;
                 if (!state.connected) return;
                 // اگر ویدیو را طرف مقابل باز کرده، وضعیت او مرجع است؛ وگرنه ما
                 // تازه بارگذاری کرده‌ایم و وضعیت خودمان را اعلام می‌کنیم.
@@ -903,6 +939,10 @@ async function loadYouTube(videoId, share) {
                 if (!ytReady) return;
                 const st = e.data;   // 1=پخش 2=مکث 3=بافر
 
+                if (st === 0) {
+                    onMediaEnded();
+                    return;
+                }
                 if (st === 3) {
                     noteWaiting();
                     return;
@@ -928,6 +968,588 @@ async function loadYouTube(videoId, share) {
     });
     if (share && state.connected) toPartner({ type: 'source', kind: 'youtube', videoId: videoId });
 }
+
+
+// ------------------------------------------------------------
+// صف پخش مشترک
+// ------------------------------------------------------------
+// صف برای هر دو نفر یکی است: هر تغییری کل فهرست را برای طرف مقابل می‌فرستد و
+// وقتی ویدیو تمام شد، هر دو طرف خودشان سراغ مورد بعدی می‌روند. چون هر دو همان
+// مورد را انتخاب می‌کنند، پیام queue_play طرف مقابل فقط تأیید است و دوباره بارگذاری نمی‌کند.
+// فایل‌های محلی در صف نمی‌آیند چون روی دستگاه طرف مقابل نیستند.
+const MAX_QUEUE = 30;
+const queue = { items: [], current: null };
+let pendingAutoplay = false;
+
+function queueKey(item) { return item.kind === 'youtube' ? 'yt:' + item.videoId : item.url; }
+
+function titleFromUrl(url) {
+    try {
+        const u = new URL(url);
+        const last = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '');
+        return last || u.hostname;
+    } catch (e) { return url; }
+}
+
+function makeQueueItem(url) {
+    const ytId = youTubeId(url);
+    const id = 'q' + Date.now().toString(36) + randomId(3);
+    if (ytId) return { id: id, kind: 'youtube', videoId: ytId, url: 'https://www.youtube.com/watch?v=' + ytId, title: 'ویدیوی یوتیوب' };
+    try { new URL(url); } catch (e) { return null; }
+    if (url.length > 2000) return null;
+    return { id: id, kind: 'url', url: url, title: titleFromUrl(url) };
+}
+
+function cleanQueueItem(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || raw.id.length > 24) return null;
+    const title = typeof raw.title === 'string' ? raw.title.slice(0, 200) : '';
+    if (raw.kind === 'youtube' && typeof raw.videoId === 'string' && /^[\w-]{11}$/.test(raw.videoId)) {
+        return { id: raw.id, kind: 'youtube', videoId: raw.videoId, url: 'https://www.youtube.com/watch?v=' + raw.videoId, title: title || 'ویدیوی یوتیوب' };
+    }
+    if (raw.kind === 'url' && typeof raw.url === 'string' && raw.url.length <= 2000 && /^https?:\/\//i.test(raw.url)) {
+        return { id: raw.id, kind: 'url', url: raw.url, title: title || titleFromUrl(raw.url) };
+    }
+    return null;
+}
+
+function addToQueue(url) {
+    if (queue.items.length >= MAX_QUEUE) { setStatus('صف پر است؛ حداکثر ' + MAX_QUEUE + ' ویدیو', 'error'); return false; }
+    const item = makeQueueItem(url);
+    if (!item) { setStatus('این لینک معتبر نیست؛ فقط لینک مستقیم ویدیو یا یوتیوب', 'error'); return false; }
+    if (queue.items.some((q) => queueKey(q) === queueKey(item))) { setStatus('این ویدیو از قبل در صف هست', 'error'); return false; }
+    queue.items.push(item);
+    // اگر هنوز چیزی پخش نمی‌شود، همین را باز کن
+    if (!state.hasMedia) playQueueItem(item.id, true, false);
+    else setStatus('به صف اضافه شد: ' + item.title, 'success');
+    queueChanged();
+    return true;
+}
+
+function removeFromQueue(id) {
+    queue.items = queue.items.filter((q) => q.id !== id);
+    if (queue.current === id) queue.current = null;
+    queueChanged();
+}
+
+function queueChanged() {
+    renderQueue();
+    if (state.connected) toPartner({ type: 'queue', items: queue.items, current: queue.current });
+}
+
+// هنگام جفت شدن، دو صف با هم یکی می‌شوند تا چیزی که یکی قبلاً چیده بود گم نشود
+function announceQueue() {
+    if (state.connected) toPartner({ type: 'queue', items: queue.items, current: queue.current, merge: true });
+}
+
+function receiveQueue(data) {
+    if (!Array.isArray(data.items)) return;
+    const theirs = data.items.slice(0, MAX_QUEUE).map(cleanQueueItem).filter(Boolean);
+    if (data.merge) {
+        // هر دو طرف هم‌زمان یکی می‌کنند، پس ترتیب باید برای هر دو یکسان باشد: اول صف مرجع
+        const mine = queue.items;
+        const ordered = amFollower() ? theirs.concat(mine) : mine.concat(theirs);
+        const keys = new Set();
+        queue.items = ordered.filter((item) => {
+            const k = queueKey(item);
+            if (keys.has(k)) return false;
+            keys.add(k);
+            return true;
+        }).slice(0, MAX_QUEUE);
+        if (queue.current && !queue.items.some((q) => q.id === queue.current)) queue.current = null;
+        if (!queue.current && typeof data.current === 'string' && queue.items.some((q) => q.id === data.current)) {
+            queue.current = data.current;
+        }
+        renderQueue();
+        return;
+    }
+    queue.items = theirs;
+    queue.current = typeof data.current === 'string' && theirs.some((q) => q.id === data.current) ? data.current : null;
+    renderQueue();
+}
+
+function playQueueItem(id, share, autoplay) {
+    const item = queue.items.find((q) => q.id === id);
+    if (!item) return;
+    queue.current = item.id;
+    pendingAutoplay = !!autoplay;
+    if (item.kind === 'youtube') loadYouTube(item.videoId, false);
+    else loadUrl(item.url, false);
+    renderQueue();
+    if (share && state.connected) toPartner({ type: 'queue_play', item: item, autoplay: !!autoplay });
+}
+
+function receiveQueuePlay(data) {
+    const item = cleanQueueItem(data.item);
+    if (!item) return;
+    // هر دو طرف با پایان ویدیو خودشان جلو رفته‌اند؛ دوباره بارگذاری نکن
+    if (queue.current === item.id) return;
+    if (!queue.items.some((q) => q.id === item.id)) {
+        if (queue.items.length >= MAX_QUEUE) return;
+        queue.items.push(item);
+    }
+    playQueueItem(item.id, false, !!data.autoplay);
+}
+
+function nextQueueItem() {
+    const i = queue.items.findIndex((q) => q.id === queue.current);
+    return queue.items[i + 1] || null;   // اگر چیزی از صف پخش نمی‌شد، از اول صف
+}
+
+function playNextInQueue(autoplay) {
+    const next = nextQueueItem();
+    if (!next) { playerToast('صف پخش تمام شد'); return false; }
+    playerToast('بعدی: ' + next.title);
+    playQueueItem(next.id, true, autoplay);
+    return true;
+}
+
+function onMediaEnded() {
+    state.wantPlaying = false;
+    updatePlayIcon();
+    if (!queue.current) return;
+    if (nextQueueItem()) playNextInQueue(true);
+    else playerToast('صف پخش تمام شد');
+}
+
+// بعد از رفتن خودکار به مورد بعدی، به محض آماده شدن پخش را شروع می‌کند
+function runPendingAutoplay() {
+    if (!pendingAutoplay) return false;
+    pendingAutoplay = false;
+    state.wantPlaying = true;
+    state.localStalled = false;
+    syncPlayback();
+    sendControl('play');
+    return true;
+}
+
+// وقتی ویدیو از راه دیگری باز شد (بارگذاری دستی یا انتخاب طرف مقابل)، اگر در صف بود همان را فعلی کن
+function matchQueueToSource(key) {
+    const item = queue.items.find((q) => queueKey(q) === key);
+    queue.current = item ? item.id : null;
+    renderQueue();
+}
+
+function updateQueueTitleFromYouTube(videoId) {
+    if (!ytPlayer || !ytPlayer.getVideoData) return;
+    const vd = ytPlayer.getVideoData();
+    if (!vd || !vd.title) return;
+    let changed = false;
+    queue.items.forEach((q) => {
+        if (q.kind === 'youtube' && q.videoId === videoId && q.title !== vd.title) { q.title = vd.title.slice(0, 200); changed = true; }
+    });
+    if (changed) renderQueue();
+}
+
+function renderQueue() {
+    el.queue.hidden = queue.items.length === 0;
+    el.queueCount.textContent = queue.items.length ? '(' + queue.items.length.toLocaleString('fa') + ')' : '';
+    el.queueNext.disabled = !nextQueueItem();
+    el.queueList.innerHTML = '';
+    queue.items.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'queue-item' + (item.id === queue.current ? ' current' : '');
+
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'queue-play';
+        play.title = 'پخش این ویدیو برای هر دو نفر';
+        const num = document.createElement('span');
+        num.className = 'queue-num';
+        num.textContent = item.id === queue.current ? '▶' : (index + 1).toLocaleString('fa');
+        const title = document.createElement('span');
+        title.className = 'queue-name';
+        title.textContent = item.title;
+        title.dir = 'auto';
+        const kind = document.createElement('small');
+        kind.className = 'queue-kind';
+        kind.textContent = item.kind === 'youtube' ? 'یوتیوب' : 'لینک';
+        play.append(num, title, kind);
+        play.addEventListener('click', () => playQueueItem(item.id, true, state.wantPlaying));
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'queue-remove';
+        remove.setAttribute('aria-label', 'حذف از صف');
+        remove.title = 'حذف از صف';
+        remove.textContent = '×';
+        remove.addEventListener('click', () => removeFromQueue(item.id));
+
+        li.append(play, remove);
+        el.queueList.appendChild(li);
+    });
+}
+
+
+// ------------------------------------------------------------
+// تماس صوتی و تصویری
+// ------------------------------------------------------------
+// رسانه مستقیم بین دو مرورگر (WebRTC) می‌رود و سرور فقط پیام‌های راه‌اندازی را
+// جابه‌جا می‌کند. کاندیداها جدا فرستاده نمی‌شوند: صبر می‌کنیم همه جمع شوند و یک‌جا
+// همراه SDP می‌روند، چون رگبار کاندیداها از سقف پیام در ثانیهٔ سرور رد می‌شود.
+// همیشه یک کانال تصویر هم باز می‌شود تا روشن و خاموش کردن دوربین وسط تماس، مذاکرهٔ دوباره نخواهد.
+const CALL_RING_TIMEOUT = 45000;
+const ICE_GATHER_TIMEOUT = 4000;
+const call = {
+    state: 'idle',          // idle | calling | ringing | connecting | active
+    pc: null,
+    local: null,            // MediaStream میکروفون/دوربین خودمان
+    mediaReady: null,       // Promise باز شدن میکروفون/دوربین؛ هر مرحله‌ای که رسانه لازم دارد منتظرش می‌ماند
+    videoSender: null,
+    micOn: true,
+    camOn: false,
+    incomingVideo: false,
+    ringTimer: null,
+    ringTone: null
+};
+let rtcConfigPromise = null;
+
+function getRtcConfig() {
+    if (!rtcConfigPromise) {
+        rtcConfigPromise = fetch('/rtc-config', { cache: 'no-store' })
+            .then((r) => r.ok ? r.json() : null)
+            .catch(() => null)
+            .then((cfg) => (cfg && Array.isArray(cfg.iceServers)) ? cfg : { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        // رمز TURN موقت است؛ دفعهٔ بعد دوباره بگیر
+        rtcConfigPromise.then(() => setTimeout(() => { rtcConfigPromise = null; }, 10 * 60 * 1000));
+    }
+    return rtcConfigPromise;
+}
+
+function mediaError(e) {
+    const name = e && e.name;
+    if (name === 'NotAllowedError' || name === 'SecurityError') return 'اجازهٔ دسترسی به میکروفون/دوربین داده نشد. از تنظیمات مرورگر اجازه بدهید.';
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'میکروفون یا دوربینی پیدا نشد.';
+    if (name === 'NotReadableError') return 'میکروفون یا دوربین دست برنامهٔ دیگری است.';
+    return 'دسترسی به میکروفون/دوربین ممکن نشد.';
+}
+
+async function openLocalMedia(video) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw Object.assign(new Error('no media'), { name: 'NotSupportedError' });
+    }
+    const constraints = {
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: video ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false
+    };
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+        // دوربین نشد؟ لااقل با صدا ادامه بده
+        if (!video) throw e;
+        stream = await navigator.mediaDevices.getUserMedia({ audio: constraints.audio });
+        playerToast('دوربین در دسترس نیست؛ تماس فقط با صدا ادامه می‌یابد');
+    }
+    call.local = stream;
+    call.micOn = true;
+    call.camOn = stream.getVideoTracks().length > 0;
+    renderCall();
+    return stream;
+}
+
+function stopLocalMedia() {
+    if (call.local) call.local.getTracks().forEach((t) => t.stop());
+    call.local = null;
+}
+
+function setCallState(next, label) {
+    call.state = next;
+    el.callState.textContent = label || '';
+    renderCall();
+}
+
+function renderCall() {
+    const inCall = call.state !== 'idle' && call.state !== 'ringing';
+    el.callDock.hidden = !inCall;
+    el.player.classList.toggle('in-call', inCall);
+    el.callDock.classList.toggle('connected', call.state === 'active');
+    el.callIncoming.hidden = call.state !== 'ringing';
+    el.callAudio.classList.toggle('on', inCall);
+    el.callVideo.classList.toggle('on', inCall && call.camOn);
+
+    const camTrack = call.local && call.local.getVideoTracks()[0];
+    el.localVideo.hidden = !(call.camOn && camTrack);
+    if (el.localVideo.srcObject !== call.local) el.localVideo.srcObject = call.local;
+
+    el.callMic.classList.toggle('off', !call.micOn);
+    el.callMic.setAttribute('aria-label', call.micOn ? 'خاموش کردن میکروفون' : 'روشن کردن میکروفون');
+    el.callCam.classList.toggle('off', !call.camOn);
+    el.callCam.setAttribute('aria-label', call.camOn ? 'خاموش کردن دوربین' : 'روشن کردن دوربین');
+}
+
+function setRemoteMedia(cam, mic) {
+    el.callRemote.classList.toggle('has-video', !!cam);
+    el.callRemoteMic.hidden = mic !== false;
+}
+
+function sendCallMedia() {
+    if (call.state === 'idle') return;
+    toPartner({ type: 'call_media', cam: call.camOn, mic: call.micOn });
+}
+
+function startRinging() {
+    stopRinging();
+    notify();
+    call.ringTone = setInterval(notify, 2200);
+}
+function stopRinging() {
+    clearInterval(call.ringTone);
+    call.ringTone = null;
+}
+
+async function startCall(video) {
+    if (!state.connected || call.state !== 'idle') return;
+    setCallState('calling', 'در حال زنگ زدن…');
+    try {
+        await (call.mediaReady = openLocalMedia(video));
+    } catch (e) {
+        setStatus(mediaError(e), 'error');
+        endCall(true);
+        return;
+    }
+    if (call.state === 'idle') { stopLocalMedia(); return; }
+    // ممکن است در همین فاصله دعوت طرف مقابل رسیده و پذیرفته شده باشد
+    if (call.state !== 'calling') return;
+    toPartner({ type: 'call_invite', video: call.camOn });
+    clearTimeout(call.ringTimer);
+    call.ringTimer = setTimeout(() => {
+        if (call.state === 'calling') endCall(true, 'دوستت جواب نداد');
+    }, CALL_RING_TIMEOUT);
+}
+
+async function acceptCall(video) {
+    if (call.state !== 'ringing') return;
+    stopRinging();
+    setCallState('connecting', 'در حال وصل شدن…');
+    try {
+        await (call.mediaReady = openLocalMedia(video));
+    } catch (e) {
+        setStatus(mediaError(e), 'error');
+        endCall(true);
+        return;
+    }
+    if (call.state === 'idle') { stopLocalMedia(); return; }
+    toPartner({ type: 'call_accept', video: call.camOn });
+}
+
+// رسانهٔ خودمان باید پیش از ساختن اتصال آماده باشد
+async function haveLocalMedia() {
+    if (call.mediaReady) { try { await call.mediaReady; } catch (e) {} }
+    return !!call.local && call.state !== 'idle';
+}
+
+function declineCall() {
+    if (call.state !== 'ringing') return;
+    toPartner({ type: 'call_decline' });
+    endCall(false);
+}
+
+// notifyPartner یعنی خودمان قطع کردیم و طرف مقابل باید خبردار شود
+function endCall(notifyPartner, message) {
+    if (call.state === 'idle') return;
+    if (notifyPartner && state.connected) toPartner({ type: 'call_end' });
+    clearTimeout(call.ringTimer);
+    stopRinging();
+    if (call.pc) {
+        call.pc.ontrack = null;
+        call.pc.onconnectionstatechange = null;
+        try { call.pc.close(); } catch (e) {}
+    }
+    call.pc = null;
+    call.videoSender = null;
+    call.mediaReady = null;
+    stopLocalMedia();
+    el.remoteVideo.srcObject = null;
+    setRemoteMedia(false, true);
+    el.callRemote.classList.remove('big');
+    setCallState('idle', '');
+    if (message) playerToast(message);
+}
+
+// تماس‌گیرنده کانال‌ها را می‌سازد؛ پاسخ‌دهنده اول پیشنهاد را می‌گذارد و تراک‌هایش را روی
+// همان کانال‌هایی می‌نشاند که از پیشنهاد ساخته شده‌اند (addTransceiver جدا به آن‌ها وصل نمی‌شود).
+async function createPeer(offerSdp) {
+    const cfg = await getRtcConfig();
+    const pc = new RTCPeerConnection(cfg);
+    call.pc = pc;
+    const audio = call.local.getAudioTracks()[0] || null;
+    const camTrack = call.local.getVideoTracks()[0] || null;
+    if (!offerSdp) {
+        pc.addTransceiver(audio || 'audio', { direction: 'sendrecv', streams: [call.local] });
+        call.videoSender = pc.addTransceiver(camTrack || 'video', { direction: 'sendrecv', streams: [call.local] }).sender;
+    }
+
+    const remote = new MediaStream();
+    el.remoteVideo.srcObject = remote;
+    pc.ontrack = (e) => {
+        if (!remote.getTracks().includes(e.track)) remote.addTrack(e.track);
+        const r = el.remoteVideo.play();
+        if (r && r.catch) r.catch(() => {});
+    };
+    if (offerSdp) {
+        await pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+        for (const tx of pc.getTransceivers()) {
+            const kind = tx.receiver.track.kind;
+            tx.direction = 'sendrecv';
+            if (kind === 'audio' && audio) await tx.sender.replaceTrack(audio);
+            if (kind === 'video') {
+                if (camTrack) await tx.sender.replaceTrack(camTrack);
+                call.videoSender = tx.sender;
+            }
+            if (tx.sender.setStreams) tx.sender.setStreams(call.local);
+        }
+    }
+    pc.onconnectionstatechange = () => {
+        if (call.pc !== pc) return;
+        const st = pc.connectionState;
+        if (st === 'connected') {
+            setCallState('active', '');
+            sendCallMedia();
+        } else if (st === 'disconnected') {
+            setCallState('connecting', 'اتصال تماس ضعیف شده…');
+        } else if (st === 'failed') {
+            endCall(true, 'تماس وصل نشد؛ احتمالاً شبکهٔ یکی از شما اجازهٔ تماس مستقیم نمی‌دهد');
+        }
+    };
+    return pc;
+}
+
+function gatherComplete(pc) {
+    if (pc.iceGatheringState === 'complete') return Promise.resolve();
+    return new Promise((resolve) => {
+        const done = () => { pc.removeEventListener('icegatheringstatechange', check); clearTimeout(t); resolve(); };
+        const check = () => { if (pc.iceGatheringState === 'complete') done(); };
+        const t = setTimeout(done, ICE_GATHER_TIMEOUT);
+        pc.addEventListener('icegatheringstatechange', check);
+    });
+}
+
+async function sendOffer() {
+    if (!(await haveLocalMedia())) return;
+    const pc = await createPeer();
+    await pc.setLocalDescription(await pc.createOffer());
+    await gatherComplete(pc);
+    if (call.pc !== pc) return;
+    toPartner({ type: 'call_offer', sdp: pc.localDescription.sdp });
+}
+
+async function answerOffer(sdp) {
+    if (!(await haveLocalMedia())) return;
+    const pc = await createPeer(sdp);
+    await pc.setLocalDescription(await pc.createAnswer());
+    await gatherComplete(pc);
+    if (call.pc !== pc) return;
+    toPartner({ type: 'call_answer', sdp: pc.localDescription.sdp });
+}
+
+async function handleCallSignal(data) {
+    try {
+        switch (data.type) {
+            case 'call_invite':
+                if (call.state === 'calling') {
+                    // هر دو هم‌زمان زنگ زده‌اند: طرف مرجع دعوت خودش را نگه می‌دارد و دیگری آن را می‌پذیرد
+                    if (!amFollower()) return;
+                    clearTimeout(call.ringTimer);
+                    setCallState('connecting', 'در حال وصل شدن…');
+                    if (await haveLocalMedia()) toPartner({ type: 'call_accept', video: call.camOn });
+                    return;
+                }
+                if (call.state !== 'idle') { toPartner({ type: 'call_decline', busy: true }); return; }
+                call.incomingVideo = !!data.video;
+                el.callIncomingTitle.textContent = data.video ? 'دوستت تماس تصویری گرفته' : 'دوستت تماس صوتی گرفته';
+                el.callAcceptVideo.textContent = data.video ? 'جواب با تصویر' : 'جواب با دوربین';
+                setCallState('ringing', '');
+                startRinging();
+                setStatus('تماس ورودی از دوستتان', 'connecting');
+                clearTimeout(call.ringTimer);
+                call.ringTimer = setTimeout(() => { if (call.state === 'ringing') endCall(false, 'تماس بی‌پاسخ ماند'); }, CALL_RING_TIMEOUT + 2000);
+                return;
+
+            case 'call_accept':
+                if (call.state !== 'calling') return;
+                clearTimeout(call.ringTimer);
+                setCallState('connecting', 'در حال وصل شدن…');
+                await sendOffer();
+                return;
+
+            case 'call_offer':
+                if (call.state !== 'connecting' || typeof data.sdp !== 'string') return;
+                await answerOffer(data.sdp);
+                return;
+
+            case 'call_answer':
+                if (!call.pc || typeof data.sdp !== 'string' || call.pc.signalingState !== 'have-local-offer') return;
+                await call.pc.setRemoteDescription({ type: 'answer', sdp: data.sdp });
+                return;
+
+            case 'call_media':
+                setRemoteMedia(!!data.cam, data.mic !== false);
+                return;
+
+            case 'call_decline':
+                if (call.state === 'calling') endCall(false, data.busy ? 'دوستت الان پشت خط دیگری است' : 'دوستت تماس را رد کرد');
+                return;
+
+            case 'call_end':
+                endCall(false, call.state === 'ringing' ? 'تماس قطع شد' : 'تماس تمام شد');
+                return;
+        }
+    } catch (e) {
+        console.error('call error', e);
+        endCall(true, 'برقراری تماس با خطا روبه‌رو شد');
+    }
+}
+
+function toggleMic() {
+    if (!call.local) return;
+    call.micOn = !call.micOn;
+    call.local.getAudioTracks().forEach((t) => { t.enabled = call.micOn; });
+    renderCall();
+    sendCallMedia();
+}
+
+async function toggleCam() {
+    if (!call.local) return;
+    if (call.camOn) {
+        call.local.getVideoTracks().forEach((t) => { t.stop(); call.local.removeTrack(t); });
+        if (call.videoSender) await call.videoSender.replaceTrack(null);
+        call.camOn = false;
+    } else {
+        let track;
+        try {
+            const s = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } });
+            track = s.getVideoTracks()[0];
+        } catch (e) {
+            setStatus(mediaError(e), 'error');
+            return;
+        }
+        if (!call.local) { track.stop(); return; }
+        call.local.addTrack(track);
+        if (call.videoSender) await call.videoSender.replaceTrack(track);
+        call.camOn = true;
+    }
+    el.localVideo.srcObject = null;   // تا پیش‌نمایش تراک تازه را بگیرد
+    renderCall();
+    sendCallMedia();
+}
+
+el.callAudio.addEventListener('click', () => {
+    if (call.state === 'idle') startCall(false);
+    else if (call.state === 'ringing') acceptCall(false);
+});
+el.callVideo.addEventListener('click', () => {
+    if (call.state === 'idle') startCall(true);
+    else if (call.state === 'ringing') acceptCall(true);
+    else if (call.local) toggleCam();
+});
+el.callAcceptVideo.addEventListener('click', () => acceptCall(true));
+el.callAcceptAudio.addEventListener('click', () => acceptCall(false));
+el.callDecline.addEventListener('click', declineCall);
+el.callHang.addEventListener('click', () => endCall(true, 'تماس تمام شد'));
+el.callMic.addEventListener('click', toggleMic);
+el.callCam.addEventListener('click', toggleCam);
+el.callRemote.addEventListener('click', () => el.callRemote.classList.toggle('big'));
+window.addEventListener('pagehide', () => { if (call.state !== 'idle') toPartner({ type: 'call_end' }); });
 
 // ------------------------------------------------------------
 // زیرنویس
@@ -1496,13 +2118,92 @@ function sendReaction(emoji) {
     if (now - lastReactionAt < 180) return;
     lastReactionAt = now;
     showReaction(emoji, true);
-    toPartner({ type: 'reaction', emoji: emoji });
+    const t = state.hasMedia ? P().currentTime : null;
+    addReactionMark(emoji, t, true);
+    toPartner({ type: 'reaction', emoji: emoji, t: t, src: mediaKey() });
 }
 
-function receiveReaction(emoji) {
+function receiveReaction(emoji, t, src) {
     if (!QUICK_REACTION_SET.has(emoji)) return;
     showReaction(emoji, false);
+    // واکنشی که دیر رسیده و مال ویدیوی قبلی است روی نوار این ویدیو نمی‌نشیند
+    const mine = mediaKey();
+    if (typeof src === 'string' && mine && src !== mine) return;
+    // زمانِ فرستنده مرجع است؛ اگر نفرستاده بود، لحظهٔ پخش خودمان
+    addReactionMark(emoji, typeof t === 'number' ? t : (state.hasMedia ? P().currentTime : null), false);
 }
+
+// شناسهٔ ویدیوی باز. فایل محلی شناسه ندارد چون نامش روی دو دستگاه می‌تواند فرق کند.
+function mediaKey() {
+    if (state.mode === 'youtube') return 'yt:' + ytVideoId;
+    return currentSource.kind === 'url' ? currentSource.url : null;
+}
+
+// ---- ردّ واکنش‌ها روی نوار پیشرفت ----
+// هر واکنش یک نشانه روی محور زمان می‌گذارد تا معلوم باشد کجاها بیشتر خندیدید یا ترسیدید.
+// نشانه‌های نزدیک به هم یکی می‌شوند و تعدادشان کنار آن نوشته می‌شود.
+const MAX_REACTION_MARKS = 400;
+let reactionMarks = [];
+
+function addReactionMark(emoji, t, mine) {
+    if (typeof t !== 'number' || !isFinite(t) || t < 0) return;
+    const d = P().duration || 0;
+    if (d && t > d + 5) return;
+    reactionMarks.push({ emoji: emoji, t: t, mine: mine });
+    if (reactionMarks.length > MAX_REACTION_MARKS) reactionMarks.shift();
+    renderReactionMarks();
+}
+
+function clearReactionMarks() {
+    reactionMarks = [];
+    renderReactionMarks();
+}
+
+function renderReactionMarks() {
+    el.scrubMarks.innerHTML = '';
+    const d = P().duration || 0;
+    if (!d || !reactionMarks.length) return;
+    const width = el.scrub.getBoundingClientRect().width || 600;
+    const bucketPct = Math.max(0.6, (22 / width) * 100);   // حدود ۲۲ پیکسل برای هر نشانه
+    const buckets = new Map();
+    reactionMarks.forEach((m) => {
+        const pct = clamp((m.t / d) * 100, 0, 100);
+        const key = Math.round(pct / bucketPct);
+        const b = buckets.get(key) || { sum: 0, items: [] };
+        b.sum += pct;
+        b.items.push(m);
+        buckets.set(key, b);
+    });
+    buckets.forEach((b) => {
+        const counts = new Map();
+        b.items.forEach((m) => counts.set(m.emoji, (counts.get(m.emoji) || 0) + 1));
+        let top = b.items[b.items.length - 1].emoji;
+        counts.forEach((n, e) => { if (n > counts.get(top)) top = e; });
+        const first = b.items.reduce((a, m) => (m.t < a.t ? m : a));
+
+        const mark = document.createElement('button');
+        mark.type = 'button';
+        mark.className = 'scrub-mark' + (b.items.every((m) => m.mine) ? ' mine' : '');
+        mark.style.left = (b.sum / b.items.length) + '%';
+        mark.textContent = top;
+        if (b.items.length > 1) {
+            const n = document.createElement('small');
+            n.textContent = b.items.length;
+            mark.appendChild(n);
+        }
+        const label = Array.from(counts, ([e, n]) => e + (n > 1 ? '×' + n : '')).join(' ') + ' · ' + fmtTime(first.t);
+        mark.title = label;
+        mark.setAttribute('aria-label', 'واکنش‌ها در ' + label);
+        mark.addEventListener('pointerdown', (e) => e.stopPropagation());
+        mark.addEventListener('click', (e) => {
+            e.stopPropagation();
+            seekTo(Math.max(0, first.t - 2));
+            wakeControls();
+        });
+        el.scrubMarks.appendChild(mark);
+    });
+}
+window.addEventListener('resize', () => { if (reactionMarks.length) renderReactionMarks(); });
 
 function showReaction(emoji, mine) {
     const burst = document.createElement('div');
@@ -1566,6 +2267,8 @@ el.video.addEventListener('ratechange', () => {
     renderRateMenu();
     sendControl('rate');
 });
+el.video.addEventListener('ended', onMediaEnded);
+el.video.addEventListener('canplay', runPendingAutoplay);
 el.video.addEventListener('waiting', noteWaiting);
 el.video.addEventListener('stalled', noteWaiting);
 el.video.addEventListener('playing', noteReady);
@@ -1573,6 +2276,7 @@ el.video.addEventListener('canplay', noteReady);
 el.video.addEventListener('seeked', noteReady);
 el.video.addEventListener('loadedmetadata', () => {
     updateVolumeUi();
+    renderReactionMarks();
     checkLengthMatch();
     if (state.connected) sendSourceInfo();
 });
@@ -1604,6 +2308,8 @@ function setChatEnabled(enabled) {
     el.chatSend.disabled = !on;
     el.chatInput.placeholder = on ? 'پیام خود را بنویسید…' : 'برای چت ابتدا متصل شوید';
     el.overlayChatInput.disabled = !on;
+    el.callAudio.disabled = !state.connected;
+    el.callVideo.disabled = !state.connected;
 }
 
 function chatId() { return 'm' + Date.now().toString(36) + randomId(4); }
@@ -1928,8 +2634,16 @@ el.statusFab.addEventListener('click', () => showTip(el.statusFab.title, true));
 el.loadUrl.addEventListener('click', () => {
     const url = el.videoUrl.value.trim();
     if (!url) { setStatus('لطفاً لینک را وارد کنید', 'error'); return; }
+    const ytId = youTubeId(url);
+    matchQueueToSource(ytId ? 'yt:' + ytId : url);
     loadUrl(url, true);
 });
+el.queueAdd.addEventListener('click', () => {
+    const url = el.videoUrl.value.trim();
+    if (!url) { setStatus('اول لینک ویدیو را وارد کنید', 'error'); return; }
+    if (addToQueue(url)) el.videoUrl.value = '';
+});
+el.queueNext.addEventListener('click', () => playNextInQueue(false));
 el.videoUrl.addEventListener('keydown', (e) => { if (e.key === 'Enter') el.loadUrl.click(); });
 
 el.videoFile.addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });

@@ -76,6 +76,19 @@
             <div class="field-row">
                 <input type="url" id="video-url" class="input" placeholder="لینک مستقیم ویدیو یا لینک یوتیوب" autocomplete="off" spellcheck="false" dir="ltr">
                 <button id="load-url" class="btn btn-primary" type="button">بارگذاری</button>
+                <button id="queue-add" class="btn btn-ghost" type="button" title="افزودن به صف پخش؛ وقتی ویدیوی فعلی تمام شد، این یکی برای هر دو نفر شروع می‌شود">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h12M3 12h12M3 18h7"></path><path d="M18 15v6M15 18h6"></path></svg>
+                    به صف
+                </button>
+            </div>
+
+            <div class="queue" id="queue" hidden>
+                <div class="queue-head">
+                    <span class="queue-title">صف پخش <small id="queue-count"></small></span>
+                    <span class="queue-hint">برای هر دو نفر یکی است و خودکار جلو می‌رود</span>
+                    <button id="queue-next" class="btn btn-ghost btn-sm" type="button">بعدی</button>
+                </div>
+                <ol class="queue-list" id="queue-list"></ol>
             </div>
 
             <div class="divider">یا</div>
@@ -150,6 +163,39 @@
 
             <div class="reaction-layer" id="reaction-layer" aria-hidden="true"></div>
 
+            <div class="call-dock" id="call-dock" hidden>
+                <div class="call-remote" id="call-remote" title="برای بزرگ یا کوچک کردن بزنید">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <div class="call-avatar">
+                        <span class="call-pulse"></span>
+                        <b id="call-state">در حال تماس…</b>
+                        <small id="call-remote-mic" hidden>میکروفونش خاموش است</small>
+                    </div>
+                </div>
+                <video id="local-video" class="call-local" autoplay playsinline muted hidden></video>
+                <div class="call-actions">
+                    <button class="call-ctl" id="call-mic" type="button" aria-label="خاموش کردن میکروفون" title="میکروفون">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"></path></svg>
+                    </button>
+                    <button class="call-ctl" id="call-cam" type="button" aria-label="روشن کردن دوربین" title="دوربین">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg>
+                    </button>
+                    <button class="call-ctl hang" id="call-hang" type="button" aria-label="قطع تماس" title="قطع تماس">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-3.2 0-6.2.9-8.8 2.6a1.6 1.6 0 0 0-.6 2l1 2a1.6 1.6 0 0 0 2 .8l2.6-1a1.6 1.6 0 0 0 1-1.5v-1.6a12 12 0 0 1 5.6 0v1.6a1.6 1.6 0 0 0 1 1.5l2.6 1a1.6 1.6 0 0 0 2-.8l1-2a1.6 1.6 0 0 0-.6-2A16 16 0 0 0 12 9z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="call-incoming" id="call-incoming" role="alertdialog" aria-labelledby="call-incoming-title" hidden>
+                <span class="call-ring" aria-hidden="true">📞</span>
+                <b id="call-incoming-title">دوستت تماس گرفته</b>
+                <div class="call-incoming-actions">
+                    <button id="call-accept-video" class="btn btn-primary btn-sm" type="button">جواب با تصویر</button>
+                    <button id="call-accept-audio" class="btn btn-ghost btn-sm" type="button">فقط صدا</button>
+                    <button id="call-decline" class="btn btn-danger btn-sm" type="button">رد</button>
+                </div>
+            </div>
+
             <div class="overlay-input" id="overlay-input">
                 <input type="text" id="overlay-chat-input" placeholder="پیام… و Enter" maxlength="500" autocomplete="off">
             </div>
@@ -173,6 +219,7 @@
                         <div class="scrub-fill" id="scrub-fill"><div class="scrub-thumb"></div></div>
                     </div>
                     <div class="scrub-tip" id="scrub-tip">0:00</div>
+                    <div class="scrub-marks" id="scrub-marks"></div>
                 </div>
 
                 <div class="control-row">
@@ -259,6 +306,12 @@
                     چت
                 </span>
                 <div class="actions">
+                    <button class="icon-btn call-btn" id="call-audio" type="button" title="تماس صوتی" aria-label="تماس صوتی" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"></path></svg>
+                    </button>
+                    <button class="icon-btn call-btn" id="call-video" type="button" title="تماس تصویری" aria-label="تماس تصویری" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg>
+                    </button>
                     <button class="icon-btn" id="toggle-overlay" type="button" aria-pressed="true" title="نمایش پیام‌ها روی تصویر">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="2.8"></circle></svg>
                     </button>
