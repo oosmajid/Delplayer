@@ -392,7 +392,7 @@ a{color:var(--accent);text-underline-offset:3px}
   position:absolute;left:0;right:0;bottom:0;z-index:10;
   padding:2.5rem .75rem .6rem;
   background:linear-gradient(to top,rgba(10,6,8,.92) 0%,rgba(10,6,8,.72) 45%,transparent 100%);
-  display:grid;gap:.35rem;
+  display:grid;grid-template-columns:minmax(0,1fr);gap:.35rem;
   opacity:1;transform:translateY(0);
   transition:opacity .25s ease,transform .25s ease;
 }
@@ -427,7 +427,9 @@ a{color:var(--accent);text-underline-offset:3px}
 }
 .scrub:hover .scrub-tip,.scrub.dragging .scrub-tip{opacity:1}
 
-.control-row{display:flex;align-items:center;gap:.15rem}
+/* چیدمان دکمه‌ها هم مثل محور زمان چپ‌به‌راست است: پخش سمت چپ، تنظیمات و تمام‌صفحه سمت راست */
+.control-row{display:flex;align-items:center;gap:.15rem;direction:ltr}
+.control-row .menu{direction:rtl}
 .control-row .spacer{flex:1}
 
 .ctl{
@@ -493,8 +495,8 @@ a{color:var(--accent);text-underline-offset:3px}
 .menu-item .sub{color:var(--faint);font-size:.72rem;margin-right:auto;font-family:var(--mono);direction:ltr}
 
 .reaction-menu{
-  left:-.5rem;right:auto;width:min(19rem,calc(100vw - 1.5rem));max-height:none;
-  padding:.65rem;transform:translateY(8px) scale(.97);transform-origin:bottom left;
+  left:auto;right:-.5rem;width:min(19rem,calc(100vw - 1.5rem));max-height:none;
+  padding:.65rem;transform:translateY(8px) scale(.97);transform-origin:bottom right;
   background:linear-gradient(145deg,rgba(43,27,36,.98),rgba(25,16,21,.98));
   border-color:rgba(240,137,122,.32);
 }
@@ -520,9 +522,11 @@ a{color:var(--accent);text-underline-offset:3px}
   .invite-btn span{display:none}
   .invite-btn{width:2.15rem;padding:0;justify-content:center}
   .controls{padding-left:.45rem;padding-right:.45rem}
-  .ctl{width:2rem;height:2rem}
+  .ctl{width:1.85rem;height:2rem}
+  .control-row{gap:0}
   .time{display:none}
-  .reaction-menu{left:-1.1rem;width:min(15rem,calc(100vw - 1rem));padding:.45rem}
+  .reaction-menu{left:50%;right:auto;width:min(15rem,calc(100vw - 1rem));padding:.45rem;transform:translateX(-50%) translateY(8px) scale(.97);transform-origin:bottom center}
+  .reaction-menu.open{transform:translateX(-50%)}
   .reaction-menu-head{padding:0 .1rem .3rem;margin-bottom:.35rem}
   .reaction-menu-head span{font-size:.74rem}
   .reaction-menu-head small{display:none}
