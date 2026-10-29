@@ -16,33 +16,10 @@ const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 const MAX_CONNECTIONS_PER_IP = 8;
 const MAX_MESSAGES_PER_SECOND = 15;   // پیام‌های معمولی (چت، دست‌دادن اولیه…)
 const MAX_SYNC_PER_SECOND = 25;       // همگام‌سازی و ping/pong: سهمیهٔ جدا، ولی بی‌حساب نه
-// توضیحات تماس (SDP همراه با همهٔ کاندیداها) و فهرست صف پخش از ۴ کیلوبایت بیشترند
+// فهرست صف پخش (تا ۳۰ لینک) از ۴ کیلوبایت بیشتر می‌شود
 const MAX_MESSAGE_LENGTH = 16384;
 const ID_LENGTH = 7;
 const ID_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
-
-// --- تنظیمات تماس صوتی/تصویری ---
-// بدون TURN، تماس پشت NATهای سخت‌گیر (بیشتر اینترنت همراه) وصل نمی‌شود. اگر coturn با
-// use-auth-secret راه افتاد، TURN_URLS و TURN_SECRET را بگذارید تا رمز موقت ساخته شود؛
-// یا برای رمز ثابت TURN_USERNAME و TURN_CREDENTIAL را.
-const STUN_URLS = (process.env.STUN_URLS || 'stun:stun.l.google.com:19302,stun:stun.cloudflare.com:3478')
-    .split(',').map((u) => u.trim()).filter(Boolean);
-const TURN_URLS = (process.env.TURN_URLS || '').split(',').map((u) => u.trim()).filter(Boolean);
-
-function rtcConfig() {
-    const iceServers = [];
-    if (STUN_URLS.length) iceServers.push({ urls: STUN_URLS });
-    if (TURN_URLS.length) {
-        if (process.env.TURN_SECRET) {
-            const username = String(Math.floor(Date.now() / 1000) + 12 * 3600) + ':delplayer';
-            const credential = crypto.createHmac('sha1', process.env.TURN_SECRET).update(username).digest('base64');
-            iceServers.push({ urls: TURN_URLS, username: username, credential: credential });
-        } else if (process.env.TURN_USERNAME) {
-            iceServers.push({ urls: TURN_URLS, username: process.env.TURN_USERNAME, credential: process.env.TURN_CREDENTIAL || '' });
-        }
-    }
-    return { iceServers: iceServers };
-}
 
 const ipConnections = new Map();
 const clients = new Map();   // id -> ws
@@ -134,12 +111,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
-    if (url === '/rtc-config') {
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify(rtcConfig()));
-        return;
-    }
-
     const rel = ROUTES[url];
 
     if (!rel) {
